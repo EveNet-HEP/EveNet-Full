@@ -1,0 +1,102 @@
+platform:
+  data_parquet_dir: <data_parquet_dir>
+  number_of_workers: 1 # Adjust based on your system
+  resources_per_worker: {
+    "CPU": 1,
+    "GPU": 1,
+  } # Adjust based on your system
+  batch_size: 4 # training batch size per worker
+  prefetch_batches: 1 # Number of batches to prefetch
+  # Enable GPU if available and desired
+  use_gpu: true
+
+options:
+  default: options/options.yaml
+
+  # For prediction Only
+  prediction:
+    # The directory where the prediction data is saved
+    output_dir: <output_dir>
+    # The filename of the prediction data
+    filename: <filename>
+
+    # if you want to save the point cloud (reconstructed particles) during prediction
+    save_point_cloud: true
+    # if you want to save extra features from the input data
+    extra_save:
+      []
+
+  Training:
+    # no use for prediction
+    total_epochs: 500
+    # no use for prediction
+    epochs: 500
+    # no use for prediction
+    model_checkpoint_save_path: null
+    # Path to load the checkpoint
+    model_checkpoint_load_path: <ckpt_path>
+    # If you want to load a pre-trained model without fine-tuning, specify the path
+    pretrain_model_load_path: null
+
+    diffusion_every_n_steps: 1 # how often to run diffusion
+
+    # keep the same as fine-tuning
+    Components:
+      Classification:
+        include: true
+
+      Regression:
+        include: false
+
+      Assignment:
+        include: false
+
+      Segmentation:
+        include: false
+        use_full_mask: true
+
+      GlobalGeneration:
+        include: false
+        diffusion_steps: 2
+
+      ReconGeneration:
+        include: true
+        diffusion_steps: 2
+
+      TruthGeneration:
+        include: true
+        diffusion_steps: 2
+
+    EMA:
+      enable: true               # Enable or disable EMA
+      replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
+
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: <normalization_file> # Path to normalization file
+
+
+network:
+  default: network/network-20M.yaml
+
+  Body:
+    PET:
+      feature_drop: 0.0
+  ReconGeneration:
+    feature_drop: 0.0
+  TruthGeneration:
+    feature_drop: 0.0
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info/multi_process.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance/standard_model.yaml
+
+  # overwrites
+  # ...
