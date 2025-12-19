@@ -12,11 +12,11 @@ authors = [{name = "Yulei Zhang, Ting-Hsiang Hsu"}]
 dependencies = []
 
 [project.scripts]
-evenet-train = "evenet.train:cli"
-evenet-predict = "evenet.predict:cli"
+evenet-train = "scripts.train:cli"
+evenet-predict = "scripts.predict:cli"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["evenet*"]
+include = ["evenet*","scripts", "scripts.*"]
