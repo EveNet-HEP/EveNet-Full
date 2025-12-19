@@ -15,9 +15,9 @@ from ray.data import Dataset, DataIterator, NodeIdStr, ExecutionResources
 
 import lightning as L
 from evenet.control.global_config import global_config
-from evenet.engine import EveNetEngine
 from evenet.network.callbacks.predict_writer import PredWriter
-from evenet.shared import make_process_fn, prepare_datasets
+from scripts.engine import EveNetEngine
+from scripts.shared import make_process_fn, prepare_datasets
 
 
 def predict_func(cfg):

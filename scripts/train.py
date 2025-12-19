@@ -19,8 +19,8 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from lightning.pytorch.profilers import PyTorchProfiler
 
 from evenet.control.global_config import global_config
-from evenet.shared import make_process_fn, prepare_datasets, EveNetTrainCallback
-from evenet.engine import EveNetEngine
+from scripts.shared import make_process_fn, prepare_datasets, EveNetTrainCallback
+from scripts.engine import EveNetEngine
 from evenet.utilities.logger import LocalLogger, setup_logging
 
 
