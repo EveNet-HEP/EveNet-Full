@@ -1,0 +1,3 @@
+[submodule "evenet"]
+	path = evenet
+	url = git@github.com:EveNet-HEP/Core.git
