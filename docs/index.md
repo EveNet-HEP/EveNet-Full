@@ -26,5 +26,5 @@ Here are the main resources for EveNet, collected in one place for quick access:
 - 🐍 **Python package**: [PyPI evenet](https://pypi.org/project/evenet/)  
 - 🏋️ **Pretrained weights**: [Hugging Face Model Hub](https://huggingface.co/Avencast/EveNet/tree/main)  
 - 📦 **Pretraining dataset**: [Hugging Face Datasets](https://huggingface.co/datasets/Avencast/EveNet)  
-- 💻 **Git repository**: [UW-EPE-ML/EveNet_Public](https://github.com/UW-EPE-ML/EveNet_Public)  
+- 💻 **Git repository**: [EveNet-Full](https://github.com/EveNet-HEP/EveNet-Full)  
 - 📄 **arXiv paper**: *coming soon*  
