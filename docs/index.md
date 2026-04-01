@@ -27,4 +27,20 @@ Here are the main resources for EveNet, collected in one place for quick access:
 - 🏋️ **Pretrained weights**: [Hugging Face Model Hub](https://huggingface.co/Avencast/EveNet/tree/main)  
 - 📦 **Pretraining dataset**: [Hugging Face Datasets](https://huggingface.co/datasets/Avencast/EveNet)  
 - 💻 **Git repository**: [EveNet-Full](https://github.com/EveNet-HEP/EveNet-Full)  
-- 📄 **arXiv paper**: *coming soon*  
+- 📄 **arXiv paper**: [2601.17126](https://arxiv.org/abs/2601.17126)  
+
+## Citation
+
+If you use EveNet in your research, please cite our paper:
+
+```bibtex
+@article{Hsu:2026sww,
+    author = "Hsu, Ting-Hsiang and others",
+    title = "{EveNet: A Foundation Model for Particle Collision Data Analysis}",
+    eprint = "2601.17126",
+    archivePrefix = "arXiv",
+    primaryClass = "hep-ex",
+    month = "1",
+    year = "2026"
+}
+```
