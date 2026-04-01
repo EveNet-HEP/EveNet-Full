@@ -36,4 +36,5 @@ https://github.com/EveNet-HEP/EveNet_Result_Plot
 ## Notes
 
 - Each task is maintained in its own repository.  
-- Configurations are representative and may not exactly reproduce large-scale training in the paper.  
+- Configurations are representative and may not exactly reproduce large-scale training in the paper.
+- See [Resources](index.md#resources) for docker images and pretrained weights.
