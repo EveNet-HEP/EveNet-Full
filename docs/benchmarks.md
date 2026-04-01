@@ -9,21 +9,21 @@ Each task is self-contained. For instructions, refer to the README of the corres
 
 ## Links
 
-### TT2L Quantum Entanglement
-- Dataset: https://huggingface.co/datasets/Avencast/EveNet-TT2L-QuantumCorrelation  
-- Code: https://github.com/EveNet-HEP/TT2L-QC-Study  
-
-### Grid Study (CMS Open Data)
-- Dataset: https://huggingface.co/datasets/Avencast/EveNet-GridStudy-CMSOpenData  
-- Code: https://github.com/EveNet-HEP/CMSOpenData-GridStudy  
-
-### Exotic Higgs (H→aa→4b)
-- Dataset: https://huggingface.co/datasets/Avencast/EveNet-ExoticHiggs-H2a4b  
-- Code: https://github.com/EveNet-HEP/Exotic-Higgs-Study  
+### Grid Study
+- Dataset: [Hugging Face](https://huggingface.co/datasets/Avencast/EveNet-GridStudy-CMSOpenData)
+- Code: [GitHub](https://github.com/EveNet-HEP/CMSOpenData-GridStudy)
 
 ### Upsilon Anomaly Detection
-- Dataset: https://zenodo.org/records/14618719  
-- Code: https://github.com/EveNet-HEP/CMSOpenData-Upsilon-AnomalyDetection  
+- Dataset: [Zenodo](https://zenodo.org/records/14618719)
+- Code: [GitHub](https://github.com/EveNet-HEP/CMSOpenData-Upsilon-AnomalyDetection)
+
+### Exotic Higgs (H→aa→4b)
+- Dataset: [Hugging Face](https://huggingface.co/datasets/Avencast/EveNet-ExoticHiggs-H2a4b)
+- Code: [GitHub](https://github.com/EveNet-HEP/Exotic-Higgs-Study)
+
+### TT2L Quantum Entanglement
+- Dataset: [Hugging Face](https://huggingface.co/datasets/Avencast/EveNet-TT2L-QuantumCorrelation)
+- Code: [GitHub](https://github.com/EveNet-HEP/TT2L-QC-Study)
 
 ---
 
