@@ -4,55 +4,58 @@ New to EveNet? This tutorial walks you through the end-to-end workflow so you ca
 
 ---
 
-## 1. Choose Your Setup Path
+## 1. EveNet Setup
 
-### Option A — Quick Start (Docker + PyPI)
+EveNet requires a controlled environment due to custom dependencies (e.g. `torch-linear-assignment`) and GPU-specific configurations.  
+We therefore use a Docker-based workflow together with a local source checkout.
 
-Ideal when you want the official binaries and ready-made CLIs without touching the source code.
+---
 
-1. Pull the runtime image that bundles CUDA, PyTorch, Ray, and common utilities.
-   ```bash
-   docker pull docker.io/avencast1994/evenet:1.5
-   docker run --gpus all -it \
-     -v /path/to/your/data:/workspace/data \
-     docker.io/avencast1994/evenet:1.5
-   ```
-2. Inside the container (or any GPU-ready Python 3.12+ environment), install EveNet from PyPI.
-   ```bash
-   pip install evenet
-   ```
-3. Invoke the packaged CLIs with your configuration files.
-   ```bash
-   evenet-train share/finetune-example.yaml --ray_dir ~/ray_results
-   evenet-predict share/predict-example.yaml
-   ```
+### 1. Clone Repository
 
-This path is “plug and play”—you only manage YAML configs and data paths.
+```bash
+git clone --recursive https://github.com/EveNet-HEP/EveNet-Full.git
+cd EveNet-Full
+```
 
-### Option B — Advanced (Source Checkout)
+---
 
-Choose this when you want to edit the Lightning modules, extend datasets, or customize the CLI behavior.
+### 2. Launch Docker Environment
 
-1. Clone the repository (or mount it inside the Docker image from Option A).
-   ```bash
-   git clone https://github.com/UW-ePE-ML/EveNet_Public.git
-   cd EveNet_Public
-   ```
-2. Reuse the provided Docker image **or** create your own environment on Python 3.12+.
-   - Docker: bind mount your checkout and data into the container so code changes persist.
-   - Native install: `pip install -r requirements.txt` (plus any CUDA/PyTorch builds required by your system).
-3. Run the CLIs straight from source when iterating rapidly.
-   ```bash
-   python -m evenet.train share/finetune-example.yaml --ray_dir ~/ray_results
-   python -m evenet.predict share/predict-example.yaml
+```bash
+docker pull docker.io/avencast1994/evenet:1.5
 
-   # or call the scripts directly
-   python evenet/train.py share/finetune-example.yaml --ray_dir ~/ray_results
-   python evenet/predict.py share/predict-example.yaml
-   ```
+docker run --gpus all -it \
+  -v /path/to/your/data:/workspace/data \
+  -v $(pwd):/workspace/EveNet_Full \
+  docker.io/avencast1994/evenet:1.5
+```
 
-Both options are interoperable—you can install the PyPI package for quick tests and then switch to the cloned source for deeper development.
+---
 
+### 3. Run EveNet
+
+Inside the container:
+
+```bash
+cd /workspace/EveNet_Full
+
+python -m evenet.train share/finetune-example.yaml --ray_dir ~/ray_results
+python -m evenet.predict share/predict-example.yaml
+```
+
+---
+
+## Notes
+
+- Docker ensures all dependencies (CUDA, PyTorch, and custom libraries) are correctly configured.  
+- Running from source allows full flexibility for modifying models, datasets, and training pipelines.  
+- This setup is required for reproducing results and is recommended for all users.  
+
+**Setup time:**
+- Typical setup time is dominated by downloading the Docker image (~5–10 GB), which usually takes ~5–15 minutes depending on network speed.  
+- Container startup and repository cloning typically take less than 1 minute each, resulting in a total setup time of ~10–20 minutes on a standard GPU-enabled desktop.  
+- No additional compilation is required, as all dependencies are pre-installed in the Docker image.
 ---
 
 ## 2. Understand the Project Layout (Advanced Users)
@@ -62,7 +65,6 @@ Before running any commands, skim these key directories:
 - `evenet/` – PyTorch Lightning modules, Ray data pipelines, and trainer utilities.
 - `share/` – Ready-to-edit YAML configurations for fine-tuning and prediction.
 - `docs/` – Reference documentation that expands on this tutorial. Start with [Model Architecture Tour](model_architecture.md) to see how point-cloud and global features flow through EveNet.
-- `downstreams/` – Example downstream analysis scripts built on top of EveNet outputs.
 
 ---
 
