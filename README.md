@@ -1,6 +1,6 @@
 # EveNet 🌌
 
-[![Open App](https://img.shields.io/badge/Open-Doc-blue?style=for-the-badge)](https://uw-epe-ml.github.io/EveNet_Public/)
+[![Open App](https://img.shields.io/badge/Open-Doc-blue?style=for-the-badge)](https://evenet-hep.github.io/EveNet-Full/)
 
 
 EveNet is a pretrained, multi-task foundation model for event-level collider physics. 
@@ -26,11 +26,22 @@ Start directly from pretrained EveNet checkpoints for fine-tuning or inference:
 
 Explore the full documentation site for setup options, configuration references, and tutorials:
 
-[uw-epe-ml.github.io/EveNet_Public](https://uw-epe-ml.github.io/EveNet_Public/)
+[EveNet-Full](https://evenet-hep.github.io/EveNet-Full/)
 
 ---
 
-## 🤝 Contributing
+## 🤝 Citation
 
-Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks.
-When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
+If you use EveNet in your research, please cite our paper:
+
+```bibtex
+@article{Hsu:2026sww,
+    author = "Hsu, Ting-Hsiang and others",
+    title = "{EveNet: A Foundation Model for Particle Collision Data Analysis}",
+    eprint = "2601.17126",
+    archivePrefix = "arXiv",
+    primaryClass = "hep-ex",
+    month = "1",
+    year = "2026"
+}
+```
