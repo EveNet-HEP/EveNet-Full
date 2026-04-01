@@ -23,7 +23,7 @@ Use the navigation menu to jump straight to the guide you need, or start with th
 Here are the main resources for EveNet, collected in one place for quick access:
 
 - 🐳 **Docker image**: [`docker.io/avencast1994/evenet:1.5`](https://hub.docker.com/r/avencast1994/evenet)  
-- 🐍 **Python package**: [PyPI evenet](https://pypi.org/project/evenet/)  
+- 🐍 **Python package**: [PyPI evenet](https://pypi.org/project/evenet-core/)  
 - 🏋️ **Pretrained weights**: [Hugging Face Model Hub](https://huggingface.co/Avencast/EveNet/tree/main)  
 - 📦 **Pretraining dataset**: [Hugging Face Datasets](https://huggingface.co/datasets/Avencast/EveNet)  
 - 💻 **Git repository**: [EveNet-Full](https://github.com/EveNet-HEP/EveNet-Full)  

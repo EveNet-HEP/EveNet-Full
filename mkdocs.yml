@@ -10,7 +10,8 @@ nav:
   - Training: train.md
 #  - Prediction: predict.md
   - Configuration Reference: configuration.md
-  - Internal Notes: preprocess_internal_only.md
+#  - Internal Notes: preprocess_internal_only.md
+  - Benchmarks: benchmarks.md
 theme:
   name: readthedocs
   custom_dir: docs/overrides
