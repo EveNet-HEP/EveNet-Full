@@ -40,8 +40,11 @@ Inside the container:
 ```bash
 cd /workspace/EveNet_Full
 
-python -m evenet.train share/finetune-example.yaml --ray_dir ~/ray_results
-python -m evenet.predict share/predict-example.yaml
+# add path to PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
+
+python scripts/train.py share/finetune-example.yaml --ray_dir ~/ray_results
+python scripts/predict.py share/predict-example.yaml
 ```
 
 ---
@@ -121,14 +124,9 @@ See [data preparation guide](data_preparation.md) for details on schema, normali
    ```bash
    export WANDB_API_KEY=<your_key>
    ```
-2. Launch training with your updated YAML.
-   - **Quick start users:** run the packaged CLI after `pip install evenet`.
+2. Launch training with your updated YAML: execute the module directly to pick up local code edits.
      ```bash
-     evenet-train path/to/your-train-config.yaml
-     ```
-   - **Source checkout:** execute the module directly to pick up local code edits.
-     ```bash
-     python -m evenet.train path/to/your-train-config.yaml
+     python scripts/train.py path/to/your-train-config.yaml
      ```
 3. Monitor progress:
    - Console output provides per-epoch metrics and checkpoint locations.
@@ -141,11 +139,8 @@ See [data preparation guide](data_preparation.md) for details on schema, normali
 1. Ensure the prediction YAML points to your trained (or pretrained) checkpoint via `options.Training.model_checkpoint_load_path`.
 2. Launch inference with either interface.
    ```bash
-   # PyPI package
-   evenet-predict path/to/your-predict-config.yaml
-
    # Source checkout
-   python -m evenet.predict path/to/your-predict-config.yaml
+   python scripts/predict.py path/to/your-predict-config.yaml
    ```
 3. Outputs land in the configured writers (e.g., parquet, numpy archives). See `docs/predict.md` for writer options and schema notes.
 
