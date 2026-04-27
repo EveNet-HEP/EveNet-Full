@@ -98,8 +98,26 @@ def main():
             files = args.files
         train_files = val_files = test_files = None
 
-    k1, k2 = global_config.event_info.classification_names[0].split('/')
-    process_ids = global_config.event_info.class_label[k1][k2][0]
+    names = global_config.event_info.classification_names
+    labels = global_config.event_info.class_label
+
+    def get_process_ids(names, labels):
+        if not names:
+            return []
+
+        first = names[0]
+
+        # Safely unpack "k1/k2"
+        try:
+            k1, k2 = first.split('/')
+        except ValueError:
+            return []
+
+        # Safe dictionary access
+        return labels.get(k1, {}).get(k2, [])[:1] or []
+
+    process_ids = get_process_ids(names, labels)
+    if len(process_ids) > 0: process_ids = process_ids[0]
 
     assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
 
