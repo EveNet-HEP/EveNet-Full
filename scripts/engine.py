@@ -809,7 +809,7 @@ class EveNetEngine(L.LightningModule):
                 num_steps=self.neutrino_diffusion_steps,
                 use_tqdm=False,
                 process_name=f"Neutrino",
-                remove_padding=True,
+                remove_padding=False,
             )
 
             for i in range(data_shape[-1]):

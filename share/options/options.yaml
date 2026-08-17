@@ -24,6 +24,14 @@ Training:
   log_gradient_step: 100 # how often to log gradient
 
   Components:
+    InvisibleInputProjector:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "lion"
+      warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
