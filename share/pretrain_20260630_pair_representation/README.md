@@ -34,8 +34,8 @@ pair heads. Triangle attention remains disabled; triangle multiplication and pai
 transitions remain active in every iterative pair-update block. On the first
 validation batch of every epoch, the iterative run logs raw/P0/PL separation
 scores, a group-separation table, and PCA explained variance to W&B. Each process
-gets one paper-style diagnostic at `pair_monitor/pca/<process>` with raw, P0, PL,
-and PL-P0 PCA distributions plus separation and signed-gain panels. The compact
-cross-process distribution is logged at `pair_monitor/summary`. The display-only
+gets PCA distributions at `pair_monitor/pca/<process>` and the separation and
+signed-gain metrics in a separate `pair_monitor/metrics/<process>` panel. The summary
+logs per-process separation and gain bar charts at `pair_monitor/summary`. The display-only
 sample cap is configured by `Metrics.PairRepresentation.plot_max_pairs_per_group`;
 it does not change the scalar metrics.
