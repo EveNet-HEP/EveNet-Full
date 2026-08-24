@@ -31,6 +31,9 @@ def train_func(cfg):
     total_events = cfg['total_events']
     total_val_events = cfg['total_val_events']
     world_rank = ray.train.get_context().get_world_rank()
+    random_seed = cfg.get("random_seed", None)
+    if random_seed is not None:
+        L.seed_everything(random_seed, workers=True)
     global_config.load_yaml(cfg['global_config_path'], current_dir=cfg['current_dir'])
 
     log_cfg = cfg.get('logger', {})
@@ -220,6 +223,7 @@ def main(args: argparse.Namespace) -> None:
         "total_events": total_events,
         "total_val_events": total_val_events,
         "early_stopping": global_config.options.Training.EarlyStopping,
+        "random_seed": global_config.options.Training.get("random_seed", None),
         "global_config_path": config_path,
         "current_dir": os.getcwd(),
     }

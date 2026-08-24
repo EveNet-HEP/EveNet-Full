@@ -1,8 +1,9 @@
 import json
+import random
 import numpy as np
 from pathlib import Path
 from functools import partial
-from ray.data import Dataset
+from ray.data import Dataset, FileShuffleConfig
 import ray
 from ray.data.dataset import MaterializedDataset
 from rich.table import Table
@@ -60,16 +61,26 @@ def register_dataset(
         platform_info,
         dataset_limit: float = 1.0,
         file_shuffling: bool = False,
+        file_shuffle_seed: int | None = None,
 ) -> tuple[Dataset, int]:
     """Registers a Ray dataset, preprocesses it, and returns dataset and event count."""
+    file_shuffle_config = None
+    if file_shuffling:
+        if file_shuffle_seed is None:
+            file_shuffle_seed = random.SystemRandom().randrange(2 ** 32)
+            logging.warning(
+                "Dataset.file_shuffle_seed is null; generated random seed %d for this run.",
+                file_shuffle_seed,
+            )
+        file_shuffle_config = FileShuffleConfig(seed=file_shuffle_seed)
+
     ds = ray.data.read_parquet(
         parquet_files,
         override_num_blocks=len(parquet_files) * min(platform_info.number_of_workers, 8),
         ray_remote_args={
             "num_cpus": 0.5,
         },
-        # Disable file-level shuffling for inference
-        shuffle="files" if file_shuffling else None,
+        shuffle=file_shuffle_config,
     )
 
     if dataset_limit < 1.0:
@@ -106,6 +117,7 @@ def prepare_datasets(
     val_end_index = int(len(parquet_files) * val_split[1])
     dataset_limit = global_config.options.Dataset.dataset_limit
     dataset_limit_val = global_config.options.Dataset.get("dataset_limit_apply_to_val_set", False)
+    file_shuffle_seed = global_config.options.Dataset.get("file_shuffle_seed", None)
 
     if predict:
         predict_ds, predict_count = register_dataset(
@@ -144,6 +156,7 @@ def prepare_datasets(
 
         train_ds, train_count = register_dataset(train_files, **{
             "file_shuffling": True,
+            "file_shuffle_seed": file_shuffle_seed,
             "dataset_limit": dataset_limit,
             **dataset_kwargs
         })

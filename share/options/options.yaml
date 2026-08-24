@@ -1,4 +1,6 @@
 Training:
+  # Optional reproducibility seed. Null preserves the historical behavior.
+  random_seed: null
   # Total plan epochs for optimizer decay
   total_epochs: 100
   # Trainer will stop at this epoch number
@@ -252,6 +254,8 @@ Dataset:
   # If dataset_limit_apply_to_val_set is True, both training and validation sets are limited to the fraction specified by dataset_limit.
   # If False, only the training set is limited, and the validation set uses the full data in the specified val_split range.
   dataset_limit_apply_to_val_set: False
+  # If null, training generates and warns with a random file-order seed.
+  file_shuffle_seed: null
   val_split: [ 0.7, 1.0 ]
 
 Metrics:
