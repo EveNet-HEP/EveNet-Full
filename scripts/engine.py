@@ -802,7 +802,12 @@ class EveNetEngine(L.LightningModule):
         payload = dict(result.metrics)
         payload["epoch"] = self.current_epoch
         for figure_name, figure in result.figures.items():
-            payload[f"pair_monitor/{figure_name}"] = wandb.Image(figure)
+            key = (
+                figure_name
+                if figure_name.startswith(("pca/", "metrics/"))
+                else f"pair_monitor/{figure_name}"
+            )
+            payload[key] = wandb.Image(figure)
         if result.rows:
             columns = list(result.rows[0])
             payload["pair_monitor/group_separation"] = wandb.Table(
