@@ -1,0 +1,162 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M"
+  number_of_workers: 4
+  resources_per_worker:
+    CPU: 30
+    GPU: 1
+  batch_size: 512
+  prefetch_batches: 2
+
+logger:
+  wandb:
+    project: "Pretrain-Pair-Representation"
+    entity: "ytchou97-university-of-washington"
+    name: "Pretrain-Pair-Representation"
+    run_name: &logger_name "pair-representation-iterative-tri-attention-20M-0p001"
+    tags: ["Pretrain", "NERSC", "Multi-Node", "20M", "Ablation", "0.001-Data", "Pair-Iterative"]
+    simplified: false
+  local:
+    save_dir: "/pscratch/sd/t/tihsu/tmp"
+    name: *logger_name
+    version: "pair-representation-20M-0p001"
+
+options:
+  default: ../options/options.yaml
+
+  Training:
+    total_epochs: 30
+    epochs: 30
+    random_seed: 20260630
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/checkpoints/iterative-update.20M.pair-representation-tri-attention.0p001"
+    model_checkpoint_load_path: null
+    pretrain_model_load_path: null
+
+    diffusion_every_n_epochs: 3
+    diffusion_every_n_steps: 100
+    eval_metrics_every_n_epochs: 1
+
+    learning_rate: &lr 0.000012
+    learning_rate_warm_up_factor: 1.0
+    weight_decay: &wd 0.001
+    optimizer_type_base: &opt "lion"
+    Components:
+      GlobalEmbedding:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      PET:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      ObjectEncoder:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Classification:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Regression:
+        include: false
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Assignment:
+        include: false
+      Segmentation:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+        use_full_mask: true
+      GlobalGeneration:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      ReconGeneration:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      TruthGeneration:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+
+    ProgressiveTraining:
+      stages:
+        - name: "full_training"
+          epoch_ratio: 1.0
+          transition_ratio: 0.1
+          loss_weights:
+            generation-truth: [1.0, 1.0]
+            generation-recon: [1.0, 1.0]
+            classification: [1.0, 1.0]
+            classification-noised: [1.0, 1.0]
+          train_parameters:
+            noise_prob: [1.0, 1.0]
+            reco_attn_mask: [0.0, 0.0]
+            ema_decay: [0.9, 0.999]
+    FAMO:
+      turn_on: false
+
+    EMA:
+      update_every_n_steps: 10
+      enable: true
+      decay: 0.999
+      replace_model_after_load: true
+
+    EarlyStopping:
+      patience: 50
+      min_delta: 0.0
+      monitor: "val/loss"
+      mode: "min"
+      verbose: true
+
+  Dataset:
+    dataset_limit: 0.001
+    dataset_limit_apply_to_val_set: true
+    file_shuffle_seed: 20260630
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M/normalization.pt"
+    val_split: [0.7, 1.0]
+
+  Metrics:
+    PairRepresentation:
+      enabled: true
+      every_n_epochs: 1
+      max_pairs_per_process_group: 256
+      max_pairs_per_event_group: 32
+      plot_max_pairs_per_group: 128
+      random_seed: 20260630
+      include_all_processes: true
+    Generation-Binning:
+      "global-HT": [50, 2, 8]
+
+network:
+  default: ../network/network-20M.yaml
+  Body:
+    PairCreator:
+      create:
+        - logDeltaR
+        - logMass
+        - logKT
+        - logPTRatio
+    PET:
+      attention_bias_type: "IterativeUpdate"
+      pair_dim: 32
+      pair_num_heads: 4
+      use_triangle_attention: true
+
+event_info:
+  default: ../event_info/multi_process.yaml
+
+resonance:
+  default: ../resonance/standard_model.yaml
