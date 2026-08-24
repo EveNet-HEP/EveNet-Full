@@ -40,9 +40,18 @@ def make_process_fn(base_dir: Path):
         "Segmentation": "segmentation-",
     }
 
+    pair_monitor_enabled = global_config.options.Metrics.get(
+        "PairRepresentation", {}
+    ).get("enabled", False)
+
     for name, prefix in component_map.items():
         component = getattr(global_config.options.Training.Components, name)
-        if drop_column_prefix and not getattr(component, "include", False):
+        keep_segmentation_truth = name == "Segmentation" and pair_monitor_enabled
+        if (
+            drop_column_prefix
+            and not getattr(component, "include", False)
+            and not keep_segmentation_truth
+        ):
             drop_column_prefix.append(prefix)
 
     logging.warning(f"Dropping columns: {drop_column_prefix}")

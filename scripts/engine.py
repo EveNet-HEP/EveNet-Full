@@ -26,6 +26,7 @@ from evenet.network.metrics.assignment import shared_step as ass_step, shared_ep
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
+from evenet.network.metrics.pair_representation import PairRepresentationMonitor
 from evenet.network.metrics.segmentation import SegmentationMetrics
 from evenet.network.metrics.segmentation import shared_step as seg_step, shared_epoch_end as seg_end
 from evenet.network.loss.famo import FAMO
@@ -234,6 +235,27 @@ class EveNetEngine(L.LightningModule):
 
         self.eval_metrics_every_n_epochs: int = global_config.options.Training.get("eval_metrics_every_n_epochs", 1)
         self.eval_metrics: bool = False
+
+        pair_monitor_cfg = global_config.options.Metrics.get("PairRepresentation", {})
+        self.pair_monitor = None
+        self.pair_monitor_result = None
+        self.pair_monitor_every_n_epochs = int(pair_monitor_cfg.get("every_n_epochs", 1))
+        if self.pair_monitor_every_n_epochs < 1:
+            raise ValueError("Metrics.PairRepresentation.every_n_epochs must be positive")
+        if pair_monitor_cfg.get("enabled", False):
+            self.pair_monitor = PairRepresentationMonitor(
+                max_pairs_per_process_group=int(
+                    pair_monitor_cfg.get("max_pairs_per_process_group", 256)
+                ),
+                max_pairs_per_event_group=int(
+                    pair_monitor_cfg.get("max_pairs_per_event_group", 32)
+                ),
+                random_seed=int(pair_monitor_cfg.get("random_seed", 12345)),
+                include_all_processes=bool(
+                    pair_monitor_cfg.get("include_all_processes", True)
+                ),
+                sync_distributed=True,
+            )
 
         # only save loss during prediction
         self.save_loss_predict: bool = self.config.options.get('prediction', {}).get('save_loss', False)
@@ -478,12 +500,22 @@ class EveNetEngine(L.LightningModule):
                 prefix="progressive/schedule-"
             )
 
+        monitor_pair_states = (
+            self.pair_monitor is not None
+            and not self.training
+            and batch_idx == 0
+            and (self.current_epoch + 1) % self.pair_monitor_every_n_epochs == 0
+            and schedules.get("deterministic", False)
+        )
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,
             train_parameters=train_parameters,
             schedules=[(key, value) for key, value in schedules.items()],
+            return_pair_states=monitor_pair_states,
         )
+        if monitor_pair_states:
+            self._collect_pair_monitor(inputs, outputs)
 
         loss_raw, loss_detailed_dict, ass_predicts = self.calculate_loss(
             inputs, outputs,
@@ -720,6 +752,64 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
+    def _collect_pair_monitor(self, inputs: dict, outputs: dict) -> None:
+        pair_states = outputs["pair_representations"].get("deterministic", {})
+        required_states = ("raw", "p0", "pl", "mask")
+        missing_states = [
+            name for name in required_states if pair_states.get(name) is None
+        ]
+        required_inputs = (
+            self.target_segmentation_data_mask_key,
+            self.target_segmentation_cls_key,
+            "subprocess_id",
+        )
+        missing_inputs = [name for name in required_inputs if name not in inputs]
+        if missing_states or missing_inputs:
+            raise ValueError(
+                "Pair representation monitoring is missing "
+                f"states={missing_states}, inputs={missing_inputs}"
+            )
+
+        process_names = {
+            index: name
+            for index, name in enumerate(self.config.event_info.process_names)
+        }
+        segment_class_names = {
+            class_id: name
+            for name, class_id in self.config.event_info.segment_label.items()
+        }
+        self.pair_monitor_result = self.pair_monitor(
+            raw=pair_states["raw"],
+            p0=pair_states["p0"],
+            pl=pair_states["pl"],
+            pair_mask=pair_states["mask"],
+            target_masks=inputs[self.target_segmentation_data_mask_key],
+            target_classes=inputs[self.target_segmentation_cls_key],
+            process_ids=inputs["subprocess_id"],
+            process_names=process_names,
+            segment_class_names=segment_class_names,
+            num_segment_classes=len(segment_class_names),
+        )
+
+    def _log_pair_monitor(self) -> None:
+        result = self.pair_monitor_result
+        if self.global_rank != 0 or result is None or not result.metrics:
+            return
+
+        payload = dict(result.metrics)
+        payload["epoch"] = self.current_epoch
+        if result.figure is not None:
+            payload["pair_monitor/pca"] = wandb.Image(result.figure)
+        if result.rows:
+            columns = list(result.rows[0])
+            payload["pair_monitor/group_separation"] = wandb.Table(
+                columns=columns,
+                data=[[row[column] for column in columns] for row in result.rows],
+            )
+        self.logger.experiment.log(payload)
+        if result.figure is not None:
+            plt.close(result.figure)
+
     def predict_step(self, batch, batch_idx) -> STEP_OUTPUT:
         batch_size = batch["x"].shape[0]
         device = self.device
@@ -916,6 +1006,15 @@ class EveNetEngine(L.LightningModule):
     def on_fit_start(self) -> None:
         self.current_step = 0
 
+        if self.pair_monitor is not None and (
+            not self.model.enable_pair_creator
+            or self.model.PET.attention_bias_type != "IterativeUpdate"
+        ):
+            raise ValueError(
+                "Pair representation monitoring requires "
+                "attention_bias_type='IterativeUpdate' with PairCreator enabled"
+            )
+
         if self.simplified_log:
             if len(self.loggers) < 2:
                 raise ValueError(
@@ -1030,6 +1129,7 @@ class EveNetEngine(L.LightningModule):
 
     def on_validation_start(self):
         self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
+        self.pair_monitor_result = None
 
         self.l.info(f"[Epoch {self.current_epoch:03d}] ▶️ Validation Start | eval_metrics: {self.eval_metrics}")
         pass
@@ -1042,6 +1142,8 @@ class EveNetEngine(L.LightningModule):
 
     @time_decorator()
     def on_validation_epoch_end(self) -> None:
+        self._log_pair_monitor()
+
         if self.classification_cfg.include and self.current_schedule.get("deterministic", False) and self.eval_metrics:
             cls_end(
                 global_rank=self.global_rank,

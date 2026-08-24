@@ -259,6 +259,14 @@ Dataset:
   val_split: [ 0.7, 1.0 ]
 
 Metrics:
+  PairRepresentation:
+    enabled: false
+    every_n_epochs: 1
+    max_pairs_per_process_group: 256
+    max_pairs_per_event_group: 32
+    random_seed: 12345
+    include_all_processes: true
+
   # plotting bins: [bin_num, bin_min, bin_max]
   Generation-Binning:
     num_vectors: [ 21, -1, 20 ]
