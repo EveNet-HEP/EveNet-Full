@@ -4,7 +4,7 @@ platform:
   resources_per_worker:
     CPU: 30
     GPU: 1
-  batch_size: 2048
+  batch_size: 256
   prefetch_batches: 2
 
 logger:
