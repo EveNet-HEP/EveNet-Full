@@ -264,6 +264,7 @@ Metrics:
     every_n_epochs: 1
     max_pairs_per_process_group: 256
     max_pairs_per_event_group: 32
+    plot_max_pairs_per_group: 128
     random_seed: 12345
     include_all_processes: true
 

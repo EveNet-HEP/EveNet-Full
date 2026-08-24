@@ -29,8 +29,13 @@ python scripts/train.py share/pretrain_20260630_pair_representation/iterative_up
 
 `SimpleAddition` projects the physical pair features directly to PET attention
 biases. `IterativeUpdate` embeds the same features into a persistent pair state,
-updates it once per PET block, and uses a lightweight `pair_dim: 32` with eight
+updates it once per PET block, and uses a lightweight `pair_dim: 32` with four
 pair heads. Triangle attention remains disabled; triangle multiplication and pair
 transitions remain active in every iterative pair-update block. On the first
 validation batch of every epoch, the iterative run logs raw/P0/PL separation
-scores, a group-separation table, PCA explained variance, and a PCA figure to W&B.
+scores, a group-separation table, and PCA explained variance to W&B. Each process
+gets one paper-style diagnostic at `pair_monitor/pca/<process>` with raw, P0, PL,
+and PL-P0 PCA distributions plus separation and signed-gain panels. The compact
+cross-process distribution is logged at `pair_monitor/summary`. The display-only
+sample cap is configured by `Metrics.PairRepresentation.plot_max_pairs_per_group`;
+it does not change the scalar metrics.

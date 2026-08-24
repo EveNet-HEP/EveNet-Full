@@ -134,6 +134,7 @@ options:
       every_n_epochs: 1
       max_pairs_per_process_group: 256
       max_pairs_per_event_group: 32
+      plot_max_pairs_per_group: 128
       random_seed: 20260630
       include_all_processes: true
     Generation-Binning:
@@ -151,7 +152,7 @@ network:
     PET:
       attention_bias_type: "IterativeUpdate"
       pair_dim: 32
-      pair_num_heads: 8
+      pair_num_heads: 4
       use_triangle_attention: false
 
 event_info:

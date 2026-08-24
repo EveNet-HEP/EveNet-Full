@@ -254,6 +254,9 @@ class EveNetEngine(L.LightningModule):
                 include_all_processes=bool(
                     pair_monitor_cfg.get("include_all_processes", True)
                 ),
+                plot_max_pairs_per_group=int(
+                    pair_monitor_cfg.get("plot_max_pairs_per_group", 128)
+                ),
                 sync_distributed=True,
             )
 
@@ -798,8 +801,8 @@ class EveNetEngine(L.LightningModule):
 
         payload = dict(result.metrics)
         payload["epoch"] = self.current_epoch
-        if result.figure is not None:
-            payload["pair_monitor/pca"] = wandb.Image(result.figure)
+        for figure_name, figure in result.figures.items():
+            payload[f"pair_monitor/{figure_name}"] = wandb.Image(figure)
         if result.rows:
             columns = list(result.rows[0])
             payload["pair_monitor/group_separation"] = wandb.Table(
@@ -807,8 +810,8 @@ class EveNetEngine(L.LightningModule):
                 data=[[row[column] for column in columns] for row in result.rows],
             )
         self.logger.experiment.log(payload)
-        if result.figure is not None:
-            plt.close(result.figure)
+        for figure in result.figures.values():
+            plt.close(figure)
 
     def predict_step(self, batch, batch_idx) -> STEP_OUTPUT:
         batch_size = batch["x"].shape[0]
