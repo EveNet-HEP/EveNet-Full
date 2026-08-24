@@ -154,6 +154,7 @@ network:
       pair_dim: 32
       pair_num_heads: 4
       use_triangle_attention: true
+      use_object_to_pair: true
 
 event_info:
   default: ../event_info/multi_process.yaml
