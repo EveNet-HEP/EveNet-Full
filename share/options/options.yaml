@@ -16,7 +16,7 @@ Training:
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
   weight_decay: &wd 0.001
-  decoupled_weight_decay: &decouple_wd true
+  decoupled_weight_decay: &decouple_wd false
 
   diffusion_every_n_epochs: 20 # how often to run diffusion
   diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
