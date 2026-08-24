@@ -143,6 +143,8 @@ network:
         - logPTRatio
     PET:
       attention_bias_type: "IterativeUpdate"
+      pair_dim: 32
+      pair_num_heads: 8
       use_triangle_attention: false
 
 event_info:
