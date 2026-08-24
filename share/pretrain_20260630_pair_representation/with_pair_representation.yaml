@@ -9,7 +9,7 @@ platform:
 
 logger:
   wandb:
-    project: "Pretrain"
+    project: "Pretrain-Pair-Representation"
     entity: "ytchou97-university-of-washington"
     name: "Pretrain-Pair-Representation"
     run_name: &logger_name "pair-representation-on-20M-0p001"
