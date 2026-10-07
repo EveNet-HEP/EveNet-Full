@@ -57,3 +57,42 @@ objective remain in the pair contrastive loss module.
 The contrastive head symmetrizes only its projected branch; EveNet's ordered
 pair state and inference outputs are unchanged. Set
 `Training.Components.PairContrastive.include: false` to disable the branch.
+
+Contrastive-specific W&B diagnostics are enabled by
+`options.Metrics.PairContrastive.enabled` in `hierarchical_contrastive.yaml`:
+
+- `pair_contrastive/cosine/<level>`: PL and z cosine distributions for
+  same-event positives, cross-event positives, endpoint negatives, and sampled
+  random negatives. Companion `.../<stage>/<group>_mean` and `_count` scalars
+  track the distributions across epochs. The loss and monitor share truth masks
+  and the per-anchor random-negative cap. Histogram anchors must have both a
+  positive and a negative, just as in the loss.
+- `pair_contrastive/cross_process/<level>/<category>`: mean cosine heatmaps of
+  same-category bonds in different events, with comparison counts in each cell.
+  All local bonds contribute; missing comparisons show N/A, not zero similarity.
+  Diagonal cells compare different events within the same process. Counts are
+  directed anchor-to-candidate comparisons. The `cross_process_counts` table
+  contains the cell values; `<stage>/mean` and `<stage>/count` scalars cover the
+  off-diagonal process comparisons.
+- `pair_contrastive/embedding/<stage>/mean_variance` and `effective_rank`:
+  collapse diagnostics on unstandardized PL and normalized z. Effective rank
+  is the exponential entropy of the centered covariance spectrum; a constant
+  embedding has zero variance and rank zero. At least two samples are required.
+
+These diagnostics run on rank zero's first validation batch every
+`every_n_epochs`, skipping sanity validation, and log at validation epoch end.
+They require the contrastive branch to be enabled, reuse its assignment truth,
+and work independently of the segmentation-based `Metrics.PairRepresentation`.
+They do not gather across ranks: the process coverage describes that local
+validation batch, not the entire validation set. The older pair representation
+monitor still has its own distributed gather when enabled.
+
+`max_anchors_per_level` limits histogram anchors, `anchor_chunk_size` bounds
+each comparison block, and `max_embedding_samples` limits the covariance/SVD
+sample. These are display/diagnostic limits only; all events and all loss pairs
+are retained. Every sampled histogram anchor sees the complete local pair pool.
+The monitor uses a private seeded CPU generator and detached tensors, so it
+does not perturb training RNG or gradients. PL uses the same optional pair
+symmetrization as the head. No per-coordinate standardization is applied to
+the variance or cosine statistics. Use the same validation events and monitor
+settings across runs; the sampler seed alone cannot fix changes in batch order.

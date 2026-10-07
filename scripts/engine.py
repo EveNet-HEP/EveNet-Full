@@ -31,6 +31,7 @@ from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
 from evenet.network.metrics.pair_representation import PairRepresentationMonitor
+from evenet.network.metrics.pair_contrastive import PairContrastiveMonitor
 from evenet.network.metrics.segmentation import SegmentationMetrics
 from evenet.network.metrics.segmentation import shared_step as seg_step, shared_epoch_end as seg_end
 from evenet.network.loss.famo import FAMO
@@ -290,6 +291,19 @@ class EveNetEngine(L.LightningModule):
                 sync_distributed=True,
             )
 
+        contrastive_monitor_cfg = global_config.options.Metrics.get("PairContrastive", {})
+        self.pair_contrastive_monitor = None
+        self.pair_contrastive_monitor_result = None
+        if contrastive_monitor_cfg.get("enabled", False) and self.pair_contrastive_loss is not None:
+            self.pair_contrastive_monitor = PairContrastiveMonitor(
+                config=contrastive_monitor_cfg,
+                criterion=self.pair_contrastive_loss,
+                process_names=dict(enumerate(global_config.event_info.process_names)),
+                category_names=dict(enumerate(
+                    self.pair_contrastive_cfg["truth_mother_categories"]
+                )),
+            )
+
         # only save loss during prediction
         self.save_loss_predict: bool = self.config.options.get('prediction', {}).get('save_loss', False)
 
@@ -498,6 +512,22 @@ class EveNetEngine(L.LightningModule):
                         prog_bar=False,
                         sync_dist=True,
                     )
+
+            if (
+                self.pair_contrastive_monitor is not None
+                and not self.training
+                and self.global_rank == 0
+                and batch_idx == 0
+                and not self.trainer.sanity_checking
+                and (self.current_epoch + 1) % self.pair_contrastive_monitor.every_n_epochs == 0
+            ):
+                self.pair_contrastive_monitor_result = self.pair_contrastive_monitor(
+                    pair_state=pair_states["pl"],
+                    z=z,
+                    selected=selected,
+                    process_ids=inputs["subprocess_id"],
+                    symmetrize_pair=self.model.PairContrastive.symmetrize_pair,
+                )
 
         return loss_raw, loss_detailed_dict, ass_predicts
 
@@ -896,6 +926,26 @@ class EveNetEngine(L.LightningModule):
         for figure in result.figures.values():
             plt.close(figure)
 
+    def _log_pair_contrastive_monitor(self) -> None:
+        result = self.pair_contrastive_monitor_result
+        if self.global_rank != 0 or result is None:
+            return
+        try:
+            payload = {key: value for key, value in result.metrics.items() if math.isfinite(value)}
+            payload["epoch"] = self.current_epoch
+            payload.update({key: wandb.Image(figure) for key, figure in result.figures.items()})
+            if result.rows:
+                columns = list(result.rows[0])
+                payload["pair_contrastive/cross_process_counts"] = wandb.Table(
+                    columns=columns,
+                    data=[[row[column] for column in columns] for row in result.rows],
+                )
+            self.logger.experiment.log(payload)
+        finally:
+            for figure in result.figures.values():
+                plt.close(figure)
+            self.pair_contrastive_monitor_result = None
+
     def predict_step(self, batch, batch_idx) -> STEP_OUTPUT:
         batch_size = batch["x"].shape[0]
         device = self.device
@@ -1216,6 +1266,7 @@ class EveNetEngine(L.LightningModule):
     def on_validation_start(self):
         self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
         self.pair_monitor_result = None
+        self.pair_contrastive_monitor_result = None
 
         self.l.info(f"[Epoch {self.current_epoch:03d}] ▶️ Validation Start | eval_metrics: {self.eval_metrics}")
         pass
@@ -1229,6 +1280,7 @@ class EveNetEngine(L.LightningModule):
     @time_decorator()
     def on_validation_epoch_end(self) -> None:
         self._log_pair_monitor()
+        self._log_pair_contrastive_monitor()
 
         if self.classification_cfg.include and self.current_schedule.get("deterministic", False) and self.eval_metrics:
             cls_end(
