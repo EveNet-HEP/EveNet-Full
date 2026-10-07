@@ -43,14 +43,20 @@ def make_process_fn(base_dir: Path):
     pair_monitor_enabled = global_config.options.Metrics.get(
         "PairRepresentation", {}
     ).get("enabled", False)
+    pair_contrastive_enabled = global_config.options.Training.Components.get(
+        "PairContrastive", {}
+    ).get("include", False)
 
     for name, prefix in component_map.items():
         component = getattr(global_config.options.Training.Components, name)
         keep_segmentation_truth = name == "Segmentation" and pair_monitor_enabled
+        # Contrastive supervision needs assignment truth, not an Assignment head.
+        keep_assignment_truth = name == "Assignment" and pair_contrastive_enabled
         if (
             drop_column_prefix
             and not getattr(component, "include", False)
             and not keep_segmentation_truth
+            and not keep_assignment_truth
         ):
             drop_column_prefix.append(prefix)
 
