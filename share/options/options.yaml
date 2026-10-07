@@ -144,6 +144,8 @@ Training:
       loss_scale: 0.05
       projection_dim: 128
       temperature: 0.1
+      # none preserves SupCon; positive_negative averages each candidate group in the denominator.
+      candidate_balance: none
       symmetrize_pair: true
       # Keep all positives and endpoint negatives; cap only random negatives.
       max_random_negatives_per_anchor: 64
@@ -285,6 +287,14 @@ Metrics:
   PairContrastive:
     enabled: false
     # First validation batch on rank zero only; no embedding gather.
+    # Two levels: up to 16 scalars + 2 cosine figures. Patterns omit pair_contrastive/.
+    scalar_metrics:
+      - num_local_pairs
+      - embedding/*
+      - cosine/*/num_valid_anchors
+      - cosine/*/z/*_mean
+    cross_process_categories: [] # Opt in by category, e.g. [W], or ["*"] for all.
+    log_cross_process_table: false
     every_n_epochs: 1
     max_anchors_per_level: 128
     anchor_chunk_size: 32
@@ -300,6 +310,9 @@ Metrics:
     plot_max_pairs_per_group: 128
     random_seed: 12345
     include_all_processes: true
+    # Six pooled scalars and one overview; process names never expand scalar output.
+    plot_stages: [raw, pl, pl_minus_p0]
+    process_plots: [] # Optional process-name globs; each adds only a PL - P0 figure.
 
   # plotting bins: [bin_num, bin_min, bin_max]
   Generation-Binning:

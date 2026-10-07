@@ -59,6 +59,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
         enabled_levels: [decay_system, sibling]
+        candidate_balance: positive_negative
         max_random_negatives_per_anchor: 64
         truth_mother_categories:
           top: [t, t1, t2]
@@ -145,6 +146,14 @@ options:
   Metrics:
     PairContrastive:
       enabled: true
+      # Up to 16 scalar panels + 2 distribution figures for the two enabled levels.
+      scalar_metrics:
+        - num_local_pairs
+        - embedding/*
+        - cosine/*/num_valid_anchors
+        - cosine/*/z/*_mean
+      cross_process_categories: []
+      log_cross_process_table: false
       every_n_epochs: 1
       max_anchors_per_level: 128
       anchor_chunk_size: 32
@@ -159,11 +168,15 @@ options:
       plot_max_pairs_per_group: 128
       random_seed: 20260630
       include_all_processes: true
+      plot_stages: [raw, pl, pl_minus_p0]
+      process_plots: []
     Generation-Binning:
       "global-HT": [50, 2, 8]
 
 network:
   default: ../network/network-20M.yaml
+  Classification:
+    use_pair_representation: true
   Body:
     PairCreator:
       create:

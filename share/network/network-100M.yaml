@@ -47,6 +47,9 @@ Body:
 
 
 Classification:
+  use_pair_representation: false # Optional PET-style PL attention bias; requires IterativeUpdate.
+  pair_attention:
+    num_layers: 1 # Other block settings inherit Body.PET unless overridden here.
   num_classification_layers: 1
   hidden_dim: 512
   dropout: 0.1

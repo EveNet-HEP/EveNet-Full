@@ -289,6 +289,8 @@ class EveNetEngine(L.LightningModule):
                     pair_monitor_cfg.get("plot_max_pairs_per_group", 128)
                 ),
                 sync_distributed=True,
+                process_plots=pair_monitor_cfg.get("process_plots", []),
+                plot_stages=pair_monitor_cfg.get("plot_stages", ["raw", "pl", "pl_minus_p0"]),
             )
 
         contrastive_monitor_cfg = global_config.options.Metrics.get("PairContrastive", {})
@@ -904,27 +906,18 @@ class EveNetEngine(L.LightningModule):
 
     def _log_pair_monitor(self) -> None:
         result = self.pair_monitor_result
-        if self.global_rank != 0 or result is None or not result.metrics:
+        if self.global_rank != 0 or result is None:
             return
-
-        payload = dict(result.metrics)
-        payload["epoch"] = self.current_epoch
-        for figure_name, figure in result.figures.items():
-            key = (
-                figure_name
-                if figure_name.startswith(("pca/", "metrics/"))
-                else f"pair_monitor/{figure_name}"
-            )
-            payload[key] = wandb.Image(figure)
-        if result.rows:
-            columns = list(result.rows[0])
-            payload["pair_monitor/group_separation"] = wandb.Table(
-                columns=columns,
-                data=[[row[column] for column in columns] for row in result.rows],
-            )
-        self.logger.experiment.log(payload)
-        for figure in result.figures.values():
-            plt.close(figure)
+        try:
+            payload = {key: value for key, value in result.metrics.items() if math.isfinite(value)}
+            payload.update({key: wandb.Image(figure) for key, figure in result.figures.items()})
+            if payload:
+                payload["epoch"] = self.current_epoch
+                self.logger.experiment.log(payload)
+        finally:
+            for figure in result.figures.values():
+                plt.close(figure)
+            self.pair_monitor_result = None
 
     def _log_pair_contrastive_monitor(self) -> None:
         result = self.pair_contrastive_monitor_result
