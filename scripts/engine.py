@@ -17,6 +17,10 @@ from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
 from evenet.network.loss.assignment import convert_target_assignment
+from evenet.network.loss.pair_contrastive import (
+    HierarchicalPairContrastiveLoss,
+    PairRelationLabeler,
+)
 
 from evenet.network.metrics.general_comparison import GenericMetrics
 from evenet.network.metrics.classification import ClassificationMetrics
@@ -107,6 +111,9 @@ class EveNetEngine(L.LightningModule):
         self.recon_generation_cfg = self.component_cfg.ReconGeneration
         self.truth_generation_cfg = self.component_cfg.TruthGeneration
         self.segmentation_cfg = self.component_cfg.Segmentation
+        self.pair_contrastive_cfg = self.component_cfg.get(
+            "PairContrastive", {"include": False}
+        )
         self.generation_include = self.global_generation_cfg.include or self.recon_generation_cfg.include or self.truth_generation_cfg.include
 
         self.target_segmentation_cls_key = 'segmentation-full-class' if self.segmentation_cfg.use_full_mask else 'segmentation-class'
@@ -215,6 +222,29 @@ class EveNetEngine(L.LightningModule):
             import evenet.network.loss.generation as gen_loss
             self.gen_loss = gen_loss.loss
             self.l.info(f"generation loss initialized")
+
+        self.pair_relation_labeler = None
+        self.pair_contrastive_loss = None
+        if self.pair_contrastive_cfg.get("include", False):
+            process_info = getattr(global_config, "process_info", None)
+            if process_info is None:
+                raise ValueError(
+                    "PairContrastive requires the existing process_info truth topology"
+                )
+            self.pair_relation_labeler = PairRelationLabeler(
+                event_info=global_config.event_info,
+                process_info=process_info,
+                truth_mother_categories=self.pair_contrastive_cfg.get(
+                    "truth_mother_categories", {}
+                ),
+                heavy_ancestor_groups=self.pair_contrastive_cfg.get(
+                    "heavy_ancestor_groups", {}
+                ),
+            )
+            self.pair_contrastive_loss = HierarchicalPairContrastiveLoss(
+                self.pair_contrastive_cfg
+            )
+            self.l.info(f"pair contrastive loss initialized")
 
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
@@ -422,6 +452,53 @@ class EveNetEngine(L.LightningModule):
             loss_raw["segmentation"] = scaled_seg_loss
             loss_head_dict["segmentation"] = scaled_seg_loss
 
+        if self.pair_contrastive_cfg.get("include", False):
+            pair_states = outputs["pair_representations"].get("deterministic", {})
+            required_states = ("pl", "mask")
+            required_targets = (
+                self.target_assignment_key,
+                "assignments-indices-mask",
+                "subprocess_id",
+            )
+            missing = [
+                name for name in required_states if pair_states.get(name) is None
+            ] + [name for name in required_targets if name not in inputs]
+            if missing:
+                raise ValueError(
+                    f"PairContrastive is missing required pair/truth inputs: {missing}"
+                )
+            labels = self.pair_relation_labeler.build_labels(
+                assignments=inputs[self.target_assignment_key],
+                assignment_index_mask=inputs["assignments-indices-mask"],
+                process_ids=inputs["subprocess_id"],
+                pair_mask=pair_states["mask"],
+            )
+            selected = self.pair_relation_labeler.select_valid_pairs(labels)
+            z = self.model.PairContrastive(
+                pair_state=pair_states["pl"],
+                batch=selected["batch"],
+                i=selected["i"],
+                j=selected["j"],
+            )
+            pair_loss, pair_metrics = self.pair_contrastive_loss(
+                z=z,
+                selected=selected,
+            )
+            scaled_pair_loss = pair_loss * float(
+                self.pair_contrastive_cfg.get("loss_scale", 0.05)
+            )
+            loss_raw["pair-contrastive"] = scaled_pair_loss
+            loss_head_dict["pair-contrastive"] = scaled_pair_loss
+            pair_log_prefix = "pair_ssl" if self.training else "pair_ssl_val"
+            for name, value in pair_metrics.items():
+                if torch.isfinite(value).all():
+                    self.log(
+                        f"{pair_log_prefix}/{name}",
+                        value,
+                        prog_bar=False,
+                        sync_dist=True,
+                    )
+
         return loss_raw, loss_detailed_dict, ass_predicts
 
     @time_decorator()
@@ -479,6 +556,7 @@ class EveNetEngine(L.LightningModule):
                                      + task_weights.get("regression", 0)
                                      + task_weights.get("assignment", 0)
                                      + task_weights.get("segmentation", 0)
+                                     + task_weights.get("pair-contrastive", 0)
                              ) > 0,
         }
 
@@ -1419,7 +1497,12 @@ class EveNetEngine(L.LightningModule):
         self.l.info(f"[Model] --> Model parts: {self.model_parts}")
 
         ### Initialize FAMO ###
-        famo_task_list = ["classification", "regression", "assignment", "generation", "segmentation"]
+        famo_task_list = [
+            "classification", "regression", "assignment", "generation",
+            "segmentation",
+        ]
+        if self.pair_contrastive_cfg.get("include", False):
+            famo_task_list.append("pair-contrastive")
         if self.include_famo and self.famo_detailed_loss:
             famo_task_list = self.config.options.Training.FAMO.detailed_loss_list
 
@@ -1505,6 +1588,12 @@ class EveNetEngine(L.LightningModule):
         if self.segmentation_cfg.include:
             gradient_heads["segmentation"] = self.model.Segmentation
             loss_heads["segmentation"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.pair_contrastive_cfg.get("include", False):
+            gradient_heads["pair-contrastive"] = self.model.PairContrastive
+            loss_heads["pair-contrastive"] = torch.zeros(
+                1, device=self.device, requires_grad=True
+            )
 
         return gradient_heads, loss_heads
 
