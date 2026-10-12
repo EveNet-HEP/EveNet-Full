@@ -4,7 +4,16 @@ set -euo pipefail
 # Submit to the existing Ray cluster; prefer its dashboard HTTP address.
 job_address=${RAY_API_SERVER_ADDRESS:-${RAY_ADDRESS:?Set RAY_API_SERVER_ADDRESS or RAY_ADDRESS}}
 : "${WANDB_API_KEY:?Set WANDB_API_KEY before launching}"
-run_dir=${1:?Usage: bash launch.sh /absolute/path/to/new/log-directory}
+max_parallel=4
+if [[ "${1:-}" == "-p" || "${1:-}" == "--parallel" ]]; then
+    max_parallel=${2:?Missing parallel job count}
+    shift 2
+fi
+if [[ ! "$max_parallel" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Parallel job count must be a positive integer" >&2
+    exit 1
+fi
+run_dir=${1:?Usage: bash launch.sh [-p max_parallel] /absolute/path/to/new/log-directory}
 python_bin=${PYTHON_BIN:-python3}
 ray_bin=${RAY_BIN:-ray}
 config_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -56,18 +65,30 @@ with open(sys.argv[2], 'w') as stream:
         'RAY_OVERRIDE_JOB_RUNTIME_ENV': '1',
     }}, stream)
 PYENV
+pids=()
 for name in "${names[@]}"; do
+    while (( $(jobs -pr | wc -l) >= max_parallel )); do
+        sleep 1
+    done
     job_id="pair-mini-$(basename "$run_dir")-$name"
     "$ray_bin" job submit --address "$job_address" \
-        --submission-id "$job_id" --runtime-env "$runtime_env" --no-wait \
+        --submission-id "$job_id" --runtime-env "$runtime_env" \
         -- python3 -m scripts.train "$config_dir/$name.yaml" \
-        --ray_dir "$run_dir/$name/ray" > "$run_dir/$name.submit.log" 2>&1 || {
-            cat "$run_dir/$name.submit.log" >&2
-            exit 1
-        }
+        --ray_dir "$run_dir/$name/ray" > "$run_dir/$name.log" 2>&1 &
+    pids+=("$!")
     printf '%s\t%s\n' "$name" "$job_id" >> "$run_dir/jobs.tsv"
-    echo "$name: submitted as $job_id"
+    echo "$name: submitting as $job_id; log: $run_dir/$name.log"
     printf '  ray job logs --address %q %q --follow\n' "$job_address" "$job_id"
     printf '  ray job status --address %q %q\n' "$job_address" "$job_id"
     printf '  ray job stop --address %q %q\n' "$job_address" "$job_id"
 done
+status=0
+for index in "${!pids[@]}"; do
+    if wait "${pids[$index]}"; then
+        echo "${names[$index]}: completed"
+    else
+        echo "${names[$index]}: failed; inspect $run_dir/${names[$index]}.log" >&2
+        status=1
+    fi
+done
+exit "$status"

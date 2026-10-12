@@ -64,9 +64,10 @@ batch fits. If 1024 fails, lower all four to 512 and use fresh checkpoint paths.
 ## Launch on the existing cluster
 
 Run from this **Pair-Representation EveNet-Full checkout**. The launcher uses
-`ray job submit --no-wait` to submit four independent jobs to the existing
-cluster. The checkout and data must be at the same shared filesystem paths on
-all nodes. It does not upload the checkout or start/stop Ray.
+`ray job submit` in background processes, with at most four jobs active at a
+time by default. Each CLI process waits for its job to finish before freeing a
+slot. Use `-p 2` to run at most two jobs concurrently. The checkout and data must
+be at the same shared filesystem paths on all nodes. It does not upload the checkout or start/stop Ray.
 
 Set `RAY_API_SERVER_ADDRESS` to the head dashboard URL (for example,
 `http://HEAD_IP:8265`), or keep the existing `RAY_ADDRESS=HEAD_IP:6379` for Ray's
@@ -74,7 +75,7 @@ address discovery. `WANDB_API_KEY` must be exported. Run the launcher in the
 Shifter image that already contains the project's Python dependencies:
 
 ```bash
-shifter bash share/pretrain_20261013_pair_mini/launch.sh \
+shifter bash share/pretrain_20261013_pair_mini/launch.sh -p 4 \
   "/pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/jobs/$(date +%Y%m%dT%H%M%S)"
 ```
 
@@ -85,11 +86,17 @@ unchanged; `--load_all` is not passed.
 
 The launcher checks data assets, the triangle switch and empty checkpoint
 directories before submission. Ray schedules the jobs with the existing training
-resource requests. Each successful submission is recorded in `jobs.tsv`, with
-CLI output in `<variant>.submit.log`. Submission success does not mean training
-has finished. The launcher prints `ray job logs`, `status` and `stop` commands
-for every accepted job. Jobs keep running after the launcher exits, including
-if a later submission fails; use those job IDs to inspect or stop them.
+resource requests. Submission attempts and their IDs are recorded in `jobs.tsv`;
+each `<variant>.log` contains submission output and streamed training logs. The
+launcher stays attached until all four jobs have finished and exits nonzero if
+any submission or job fails. A failure does not prevent the remaining variants
+from being submitted. Follow a local log with `tail -f <variant>.log`.
+
+The launcher also prints `ray job logs`, `status` and `stop` commands for each
+attempted job ID. A printed ID is not proof that submission succeeded; check the
+log or Ray job status. Once accepted, jobs are managed by Ray; stopping the
+launcher does not guarantee that remote jobs stop. Use `ray job stop` for jobs
+you intend to cancel.
 
 The W&B key is forwarded through a temporary runtime-environment file with
 owner-only permissions, removed on launcher exit. The job environment allows
