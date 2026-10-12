@@ -4,6 +4,6 @@ number_of_workers: 4
 resources_per_worker:
   CPU: 20
   GPU: 1
-batch_size: 1024
+batch_size: 512
 prefetch_batches: 2
 use_gpu: true
