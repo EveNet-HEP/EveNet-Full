@@ -1,9 +1,9 @@
-# Shared per-run resources: 4 GPUs, 121 CPUs including the trainer.
+# Shared per-run resources: 16 GPUs, 321 CPUs including the trainer.
 data_parquet_dir: /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M
 number_of_workers: 16
 resources_per_worker:
   CPU: 20
   GPU: 1
-batch_size: 512
+batch_size: 1024
 prefetch_batches: 2
 use_gpu: true

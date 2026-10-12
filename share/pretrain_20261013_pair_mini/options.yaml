@@ -1,8 +1,8 @@
 # Shared resolved options for all four mini ablations. Edit this file once.
 Training:
   random_seed: 20261013
-  total_epochs: 50
-  epochs: 50
+  total_epochs: 30
+  epochs: 30
   model_checkpoint_save_top_k: 1
   model_checkpoint_save_path: null
   model_checkpoint_load_path: null

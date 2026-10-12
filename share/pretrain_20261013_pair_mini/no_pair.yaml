@@ -13,13 +13,13 @@ logger:
     - '20261013'
     simplified: false
   local:
-    save_dir: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/logs
+    save_dir: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013-16gpu-30ep/logs
     name: mini-1pct-no_pair
     version: train
 options:
   default: options.yaml
   Training:
-    model_checkpoint_save_path: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/checkpoints/no_pair
+    model_checkpoint_save_path: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013-16gpu-30ep/checkpoints/no_pair
     Components:
       PairContrastive:
         include: false
