@@ -1,0 +1,122 @@
+# Shared mini architecture; the full pair/triangle/contrastive variant is about 10M parameters.
+Body:
+  GlobalEmbedding:
+    linear_block_type: GRU
+    transformer_dim_scale: 2.0
+    initial_embedding_dim: 16
+    hidden_dim: 176
+    normalization: LayerNorm
+    linear_activation: GELU
+    num_embedding_layers: 8
+    dropout: 0.1
+    skip_connection: true
+  PET:
+    num_feature_keep: 0
+    feature_drop: 0.1
+    hidden_dim: 176
+    enable_local_embedding: true
+    local_Krank: 3
+    local_point_index:
+    - 2
+    - 3
+    num_local_layer: 10
+    num_layers: 12
+    drop_probability: 0.1
+    talking_head: false
+    layer_scale: true
+    layer_scale_init: 1.0e-05
+    num_heads: 16
+    mode: all
+    dropout: 0.1
+    pair_dim: 32
+    pair_num_heads: 4
+    use_triangle_multiplication: false
+    use_triangle_attention: false
+    use_object_to_pair: false
+    attention_bias_type: null
+  ObjectEncoder:
+    hidden_dim: 176
+    position_embedding_dim: 32
+    num_attention_heads: 8
+    transformer_dim_scale: 2.0
+    num_embedding_layers: 2
+    num_encoder_layers: 2
+    dropout: 0.1
+    skip_connection: true
+    encoder_skip_connection: true
+  PairCreator:
+    create: []
+Classification:
+  use_pair_representation: false
+  pair_attention:
+    num_layers: 1
+  num_classification_layers: 1
+  hidden_dim: 176
+  dropout: 0.1
+  skip_connection: true
+  num_attention_heads: 8
+Regression:
+  num_regression_layers: 1
+  hidden_dim: 176
+  dropout: 0.1
+  skip_connection: true
+Assignment:
+  feature_drop: 0.1
+  num_feature_keep: 0
+  hidden_dim: 176
+  split_symmetric_attention: true
+  position_embedding_dim: 32
+  num_attention_heads: 4
+  transformer_dim_scale: 2.0
+  num_jet_embedding_layers: 0
+  num_jet_encoder_layers: 0
+  num_detection_layers: 1
+  dropout: 0.1
+  combinatorial_scale: 0.0
+  encode_event_token: false
+  activation: GELU
+  num_encoder_layers: 1
+  num_linear_layers: 1
+  skip_connection: true
+  encoder_skip_connection: true
+Segmentation:
+  projection_dim: 176
+  num_heads: 8
+  dropout: 0.1
+  num_layers: 1
+  num_queries: 4
+  return_intermediate: true
+  mask_mlp_layers: 1
+  norm_before: false
+  encode_event_token: false
+GlobalGeneration:
+  num_layers: 1
+  num_resnet_layers: 1
+  hidden_dim: 64
+  resnet_dim: 64
+  layer_scale_init: 1.0e-05
+  feature_drop_for_stochastic_depth: 0.0
+  activation: SILU
+  dropout: 0.0
+ReconGeneration:
+  hidden_dim: 176
+  num_layers: 1
+  num_heads: 4
+  dropout: 0.1
+  layer_scale: true
+  layer_scale_init: 1.0e-05
+  drop_probability: 0.1
+  feature_drop: 0.1
+  extend_batch: true
+TruthGeneration:
+  hidden_dim: 176
+  num_layers: 1
+  num_heads: 4
+  dropout: 0.1
+  layer_scale: true
+  layer_scale_init: 1.0e-05
+  drop_probability: 0.1
+  feature_drop: 0.1
+  extend_batch: true
+  neutrino_position_encode: true
+  max_position_length: 36
