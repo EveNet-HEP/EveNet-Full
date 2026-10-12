@@ -173,14 +173,27 @@ same validation events, not raw loss alone. No extra dashboard panels are added.
 Contrastive-specific W&B diagnostics are enabled by
 `options.Metrics.PairContrastive.enabled` in `hierarchical_contrastive.yaml`:
 
-The default dashboard contains at most **16 scalars and 2 figures** with both
-levels enabled. It keeps the four z cosine means and valid-anchor count per
+The hierarchical run dashboard contains at most **19 scalars and 3 figures**.
+The two inclusive levels contribute 16 scalars and 2 figures; they keep the four z cosine means and valid-anchor count per
 level, PL/z variance and effective rank, local pair count, and embedding sample
 count. Read positive versus negative cosine means together: high positive
 similarity alone does not establish separation. The two distribution figures
 retain both PL and z, so PL group means do not need separate scalar panels.
 Empty comparison groups omit their mean rather than reporting zero.
 
+- `relation_subsets` adds optional diagnostic slices. This run enables
+  `decay_system_non_sibling: {level: decay_system, exclude: [sibling]}`.
+  Both anchors and positive candidates must satisfy `decay_system & ~sibling`;
+  category matching and negatives retain the original decay-system rules.
+  Excluded same-category sibling positives remain neutral, not negatives.
+  This adds one PL/z distribution figure under
+  `pair_contrastive/relation_subsets/decay_system_non_sibling`, plus three scalars:
+  `num_valid_anchors` and `<stage>/positive_negative_gap` for PL and z.
+  Each gap is the comparison-weighted positive mean minus negative mean, pooling
+  the two positive groups and the two negative groups separately. It is a
+  diagnostic, not the balanced training objective. No valid comparisons means
+  zero valid anchors and absent gap scalars, not a zero gap.
+  Set `relation_subsets: {}` to disable; training labels and loss are unchanged.
 - `scalar_metrics` selects scalar keys with glob patterns relative to
   `pair_contrastive/`; an empty list disables scalars.
 - `cross_process_categories: []` skips process heatmaps and their statistics.

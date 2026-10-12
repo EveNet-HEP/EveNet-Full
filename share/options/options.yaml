@@ -293,6 +293,9 @@ Metrics:
       - embedding/*
       - cosine/*/num_valid_anchors
       - cosine/*/z/*_mean
+      - relation_subsets/*/num_valid_anchors
+      - relation_subsets/*/*/positive_negative_gap
+    relation_subsets: {} # Optional level/exclude slices; monitoring only.
     cross_process_categories: [] # Opt in by category, e.g. [W], or ["*"] for all.
     log_cross_process_table: false
     every_n_epochs: 1
