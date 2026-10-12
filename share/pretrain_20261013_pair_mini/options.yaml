@@ -1,0 +1,370 @@
+# Shared resolved options for all four mini ablations. Edit this file once.
+Training:
+  random_seed: 20261013
+  total_epochs: 50
+  epochs: 50
+  model_checkpoint_save_top_k: 1
+  model_checkpoint_save_path: null
+  model_checkpoint_load_path: null
+  pretrain_model_load_path: null
+  learning_rate: 1.2e-05
+  learning_rate_factor: 1.0
+  learning_rate_warm_up_factor: 1.0
+  weight_decay: 0.001
+  decoupled_weight_decay: false
+  diffusion_every_n_epochs: 100
+  diffusion_every_n_steps: 100
+  eval_metrics_every_n_epochs: 1
+  apply_event_weight: false
+  log_gradient_step: 100
+  Components:
+    InvisibleInputProjector:
+      learning_rate: 5.0e-05
+      optimizer_group: generation
+      optimizer_type: lion
+      warm_up: true
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+    GlobalEmbedding:
+      learning_rate: 1.2e-05
+      optimizer_group: body
+      optimizer_type: lion
+      warm_up: true
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    PET:
+      learning_rate: 1.2e-05
+      optimizer_group: body
+      optimizer_type: lion
+      warm_up: true
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    ObjectEncoder:
+      learning_rate: 1.2e-05
+      optimizer_group: object_encoder
+      optimizer_type: lion
+      warm_up: true
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    Classification:
+      learning_rate: 1.2e-05
+      optimizer_group: classification
+      optimizer_type: lion
+      warm_up: true
+      loss_scale: 1.0
+      include: true
+      include_cross_term: true
+      loss_scale_cross_term: 1.0
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    Regression:
+      learning_rate: 1.2e-05
+      optimizer_group: regression
+      optimizer_type: lion
+      warm_up: true
+      loss_scale: 1.0
+      include: false
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    Assignment:
+      learning_rate: 5.0e-05
+      optimizer_group: assignment
+      optimizer_type: lion
+      warm_up: true
+      assignment_loss_scale: 1.0
+      detection_loss_scale: 1.0
+      focal_gamma: 1.0
+      include: false
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    Segmentation:
+      learning_rate: 1.2e-05
+      optimizer_group: segmentation
+      optimizer_type: lion
+      warm_up: true
+      include: false
+      mask_loss_scale: 1.0
+      dice_loss_scale: 1.0
+      cls_loss_scale: 1.0
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      use_full_mask: true
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    PairContrastive:
+      include: false
+      optimizer_group: body
+      learning_rate: 1.2e-05
+      optimizer_type: lion
+      warm_up: true
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      loss_scale: 0.05
+      projection_dim: 128
+      temperature: 0.1
+      candidate_balance: positive_negative
+      symmetrize_pair: true
+      max_random_negatives_per_anchor: 64
+      anchor_chunk_size: 32
+      enabled_levels:
+      - decay_system
+      - sibling
+      level_weights:
+        decay_system: 1.0
+        sibling: 1.0
+      truth_mother_categories:
+        top:
+        - t
+        - t1
+        - t2
+        W:
+        - W
+        - W1
+        - W2
+        - W+
+        - W-
+        Z:
+        - Z
+        - Z1
+        - Z2
+      heavy_ancestor_groups: {}
+    GlobalGeneration:
+      learning_rate: 1.2e-05
+      optimizer_group: generation
+      optimizer_type: lion
+      warm_up: true
+      include: false
+      loss_scale: 1.0
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      diffusion_steps: 20
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+    ReconGeneration:
+      learning_rate: 1.2e-05
+      optimizer_group: generation
+      optimizer_type: lion
+      warm_up: true
+      include: false
+      loss_scale: 1.0
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      diffusion_steps: 100
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+      use_generation_result: false
+    TruthGeneration:
+      learning_rate: 1.2e-05
+      optimizer_group: generation
+      optimizer_type: lion
+      warm_up: true
+      include: false
+      loss_scale: 1.0
+      weight_decay: 0.001
+      decoupled_weight_decay: false
+      diffusion_steps: 100
+      freeze:
+        type: none
+        partial_freeze_components: []
+        random_freeze_fraction: 0.0
+  ProgressiveTraining:
+    stages:
+    - name: full_training
+      epoch_ratio: 1.0
+      transition_ratio: 0.1
+      loss_weights:
+        generation-truth:
+        - 1.0
+        - 1.0
+        generation-recon:
+        - 1.0
+        - 1.0
+        classification:
+        - 1.0
+        - 1.0
+        classification-noised:
+        - 1.0
+        - 1.0
+        pair-contrastive:
+        - 1.0
+        - 1.0
+      train_parameters:
+        noise_prob:
+        - 1.0
+        - 1.0
+        reco_attn_mask:
+        - 0.0
+        - 0.0
+        ema_decay:
+        - 0.9
+        - 0.999
+  EarlyStopping:
+    patience: 50
+    min_delta: 0.0
+    monitor: val/loss
+    mode: min
+    verbose: true
+  FAMO:
+    turn_on: false
+    detailed_loss: false
+    detailed_loss_list:
+    - classification
+    - classification-noised
+    - generation-global
+    - generation-event
+    - generation-invisible
+    - assignment
+    - detection
+    - regression
+    - segmentation
+    logits_bound: 1.0
+    lr: 0.025
+  EMA:
+    enable: true
+    decay: 0.999
+    start_epoch: 0
+    update_every_n_steps: 10
+    replace_model_after_load: false
+    replace_model_at_end: false
+    use_ema_during_training_eval: false
+  optimizer_type_base: lion
+Dataset:
+  dataset_limit: 0.01
+  normalization_file: /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M/normalization.pt
+  balance_file: null
+  dataset_limit_apply_to_val_set: true
+  file_shuffle_seed: 20261013
+  val_split:
+  - 0.7
+  - 1.0
+Metrics:
+  PairContrastive:
+    enabled: false
+    scalar_metrics:
+    - num_local_pairs
+    - embedding/*
+    - cosine/*/num_valid_anchors
+    - cosine/*/z/*_mean
+    - relation_subsets/*/num_valid_anchors
+    - relation_subsets/*/*/positive_negative_gap
+    relation_subsets:
+      decay_system_non_sibling:
+        level: decay_system
+        exclude:
+        - sibling
+    cross_process_categories: []
+    log_cross_process_table: false
+    every_n_epochs: 5
+    max_anchors_per_level: 128
+    anchor_chunk_size: 32
+    max_embedding_samples: 2048
+    histogram_bins: 40
+    random_seed: 20261013
+  PairRepresentation:
+    enabled: false
+    every_n_epochs: 5
+    max_pairs_per_process_group: 256
+    max_pairs_per_event_group: 32
+    plot_max_pairs_per_group: 128
+    random_seed: 20261013
+    include_all_processes: true
+    plot_stages:
+    - raw
+    - pl
+    - pl_minus_p0
+    process_plots: []
+  Generation-Binning:
+    num_vectors:
+    - 21
+    - -1
+    - 20
+    point cloud-log_energy:
+    - 50
+    - -1
+    - 10
+    point cloud-log_pt:
+    - 50
+    - -1
+    - 10
+    point cloud-eta:
+    - 50
+    - -4
+    - 4
+    point cloud-phi:
+    - 50
+    - -4
+    - 4
+    point cloud-btag:
+    - 2
+    - 0
+    - 1
+    point cloud-isLepton:
+    - 2
+    - 0
+    - 1
+    point cloud-charge:
+    - 3
+    - -1
+    - 1
+    neutrino-log_mass:
+    - 10
+    - -1
+    - 1
+    neutrino-log_pt:
+    - 50
+    - 0
+    - 7
+    neutrino-eta:
+    - 50
+    - -4
+    - 4
+    neutrino-phi:
+    - 50
+    - -4
+    - 4
+    neutrino-btag:
+    - 2
+    - 0
+    - 1
+    neutrino-isLepton:
+    - 2
+    - 0
+    - 1
+    neutrino-charge:
+    - 3
+    - -1
+    - 1
+    global-HT:
+    - 50
+    - 2
+    - 8

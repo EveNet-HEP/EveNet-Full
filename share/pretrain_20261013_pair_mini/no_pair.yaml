@@ -1,0 +1,48 @@
+platform:
+  default: platform.yaml
+logger:
+  wandb:
+    project: Pretrain-Pair-Representation
+    entity: ytchou97-university-of-washington
+    run_name: mini-1pct-no_pair
+    tags:
+    - Pretrain
+    - Mini
+    - 1pct
+    - Pair-Ablation
+    - '20261013'
+    simplified: false
+  local:
+    save_dir: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/logs
+    name: mini-1pct-no_pair
+    version: train
+options:
+  default: options.yaml
+  Training:
+    model_checkpoint_save_path: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/checkpoints/no_pair
+    Components:
+      PairContrastive:
+        include: false
+  Metrics:
+    PairRepresentation:
+      enabled: false
+    PairContrastive:
+      enabled: false
+network:
+  default: ../network/network-mini.yaml
+  Classification:
+    use_pair_representation: false
+  Body:
+    PairCreator:
+      create: []
+    PET:
+      attention_bias_type: null
+      use_object_to_pair: false
+      use_triangle_attention: false
+      use_triangle_multiplication: false
+event_info:
+  default: ../event_info/multi_process.yaml
+resonance:
+  default: ../resonance/standard_model.yaml
+process_info:
+  default: ../process_info/pretrain.yaml
