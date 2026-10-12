@@ -63,39 +63,45 @@ batch fits. If 1024 fails, lower all four to 512 and use fresh checkpoint paths.
 
 ## Launch on the existing cluster
 
-Run from this **Pair-Representation EveNet-Full checkout** on a node in your
-existing allocation. Keep the same Python/container as the Ray head and workers.
-`RAY_ADDRESS` must already point to that cluster and `WANDB_API_KEY` must be set.
-The launcher checks data assets, the new triangle switch, empty checkpoint
-directories and free cluster resources before launching any training driver.
-It does not start or stop Ray. An existing occupied cluster fails the resource
-check instead of silently queuing this whole campaign.
+Run from this **Pair-Representation EveNet-Full checkout**. The launcher uses
+`ray job submit --no-wait` to submit four independent jobs to the existing
+cluster. The checkout and data must be at the same shared filesystem paths on
+all nodes. It does not upload the checkout or start/stop Ray.
 
-For the Shifter cluster used in this conversation:
+Set `RAY_API_SERVER_ADDRESS` to the head dashboard URL (for example,
+`http://HEAD_IP:8265`), or keep the existing `RAY_ADDRESS=HEAD_IP:6379` for Ray's
+address discovery. `WANDB_API_KEY` must be exported. Run the launcher in the
+Shifter image that already contains the project's Python dependencies:
 
 ```bash
-shifter --volume=/tmp/ray:/tmp/ray bash \
-  share/pretrain_20261013_pair_mini/launch.sh \
+shifter bash share/pretrain_20261013_pair_mini/launch.sh \
   "/pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/jobs/$(date +%Y%m%dT%H%M%S)"
 ```
 
-If Ray is running directly in your current Python environment:
+No `/tmp/ray` mount is needed by the submission client. The head must expose its
+Ray Jobs dashboard service. Each entrypoint runs with the cluster's `python3`.
+Data loading, batch size, worker resources and all training settings are
+unchanged; `--load_all` is not passed.
 
-```bash
-bash share/pretrain_20261013_pair_mini/launch.sh \
-  "/pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-1pct-20261013/jobs/$(date +%Y%m%dT%H%M%S)"
-```
+The launcher checks data assets, the triangle switch and empty checkpoint
+directories before submission. Ray schedules the jobs with the existing training
+resource requests. Each successful submission is recorded in `jobs.tsv`, with
+CLI output in `<variant>.submit.log`. Submission success does not mean training
+has finished. The launcher prints `ray job logs`, `status` and `stop` commands
+for every accepted job. Jobs keep running after the launcher exits, including
+if a later submission fails; use those job IDs to inspect or stop them.
 
-Use the matching command only once. The shell remains attached while all four
-drivers run concurrently. Each has a separate console log and Ray result
-directory. A failed run leaves the other runs active and causes a nonzero final
-launcher exit. Checkpoints and local logs have separate paths in each run YAML;
-W&B uses project `Pretrain-Pair-Representation` and entity
-`ytchou97-university-of-washington`. The launcher prints each console-log path.
+The W&B key is forwarded through a temporary runtime-environment file with
+owner-only permissions, removed on launcher exit. The job environment allows
+the existing `scripts.train` runtime environment to override matching keys at
+`ray.init`, as required by Ray 2.44.1. W&B uses project
+`Pretrain-Pair-Representation` and entity
+`ytchou97-university-of-washington`.
 
-From another shell, follow a printed log path with `tail -f`. If the first batch
-fails, inspect that log before increasing the batch. Confirm that all four runs
-report the same train/validation event counts and reach the first checkpoint.
+Before resubmitting, inspect the existing job IDs and stop any runs being
+replaced. Confirm all four jobs report the same train/validation event counts
+and reach their first checkpoint. Changing the submission mechanism does not
+establish that the reported memory pressure has been resolved.
 
 ## Timing and next-day inspection
 
@@ -108,7 +114,7 @@ Check the allocation's remaining wall time (`squeue -j "$SLURM_JOB_ID"`) against
 that estimate. A four-hour allocation remains four hours regardless of how many
 shells or drivers are running.
 
-Before repeating or resuming, stop the previous driver and use a new launcher
+Before repeating or resuming, stop the previous Ray job and use a new launcher
 log directory. A fresh run needs new checkpoint paths. For a manual native
 resume, set `Training.model_checkpoint_load_path` to the actual saved checkpoint
 in that run's YAML, keep the same 50-epoch schedule and architecture, and invoke
@@ -120,4 +126,4 @@ Inspect the saved epoch number, the common classification validation curves,
 pair separation and embedding variance/effective rank for the contrastive run.
 GPU memory and throughput must be measured on NERSC; local tests cover model
 construction, parameter counts, small synthetic forward/backward passes,
-triangle compatibility and launcher process handling only.
+triangle compatibility and submission command handling only.
