@@ -79,6 +79,16 @@ Prediction files retain these tensors for offline comparisons.
 
 ## Monitoring
 
+Segmentation always reports `segmentation/val/dice`, `iou`, `class_accuracy`,
+`exact_segment_accuracy`, and `exact_event_accuracy`, including when
+`network.Refinement.enabled: false`. These use the same matching, padding,
+denominators, and scoring as the refinement monitor. They describe the final
+segmentation output: the single pass without refinement or the last pass with
+refinement. Use these common keys to compare separate runs. No extra model
+forward pass is needed. `Metrics.Segmentation.mask_threshold` sets the exact-mask
+threshold; if omitted, the existing `Metrics.Refinement.mask_threshold` is used,
+falling back to 0.5. Correction/damage rates remain refinement-specific.
+
 The example recipe explicitly enables `Metrics.PairRepresentation` every epoch.
 On the first validation batch from each worker, the existing pair monitor samples
 the final refinement pass and logs the pooled `pca/all` figure (raw, PL, and
@@ -137,8 +147,9 @@ all groups, metrics, and denominators. Missing rates remain missing in the
 table. Compact segmentation keeps its two confusion matrices and puts class
 and process/multiplicity rates into `segmentation/classes` and
 `segmentation/processes` tables. Per-class score histograms are omitted in this
-mode. The two monitors therefore emit at most 20 validation panels with this
-recipe, independent of the number of processes. The training-depth scalar is
+mode. Together with the five common segmentation curves, these monitors emit
+at most 25 validation panels with this recipe, independent of the number of
+processes. The training-depth scalar is
 separate. Set either `wandb_mode` to `full` to restore its detailed panels;
 omitting the setting preserves the previous full logging behavior.
 
@@ -147,10 +158,12 @@ workspace and put iteration 0/1/2 on the same line plot for each summary metric,
 with epoch as the x-axis. Changing code/YAML requires a new or resumed training
 process; it does not update an already-running driver.
 
-When a `LocalLogger` is attached, regardless of W&B mode,
-rank zero also appends a long-format `refinement_metrics.csv` in its log directory
-with columns `epoch,step,metric,value`; sanity-validation passes are excluded
-from this file. This avoids changing the existing training CSV layout.
+When a `LocalLogger` is attached, regardless of W&B mode, rank zero appends
+`segmentation_metrics.csv` with final-output scores and denominators for the
+overall, process, and multiplicity groups. With refinement enabled it also
+retains the existing per-depth `refinement_metrics.csv`. Both use columns
+`epoch,step,metric,value` and exclude sanity-validation passes. The existing
+training CSV layout is unchanged.
 
 ## Experiment interpretation
 

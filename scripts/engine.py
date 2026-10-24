@@ -636,16 +636,7 @@ class EveNetEngine(L.LightningModule):
         self.last_refinement_depth = outputs.get("refinement_depth")
         if monitor_pair_states:
             self._collect_pair_monitor(inputs, outputs)
-        if self.refinement_metrics is not None and schedules.get("deterministic", False):
-            if self.training:
-                self.log("refinement/train/recycles", float(outputs["refinement_depth"]), sync_dist=False)
-            else:
-                self.refinement_metrics.update(
-                    outputs["refinement_steps"],
-                    inputs[self.target_segmentation_cls_key],
-                    inputs[self.target_segmentation_data_mask_key],
-                    inputs["x_mask"], inputs.get("subprocess_id"),
-                )
+        self._update_segmentation_metrics(inputs, outputs, schedules)
 
         loss_raw, loss_detailed_dict, ass_predicts = self.calculate_loss(
             inputs, outputs,
@@ -938,6 +929,26 @@ class EveNetEngine(L.LightningModule):
                 plt.close(figure)
             self.pair_monitor_result = None
 
+    def _update_segmentation_metrics(self, inputs, outputs, schedules) -> None:
+        if self.refinement_metrics is None or not schedules.get("deterministic", False):
+            return
+        if self.training:
+            if self.model.refinement_enabled:
+                self.log("refinement/train/recycles", float(outputs["refinement_depth"]), sync_dist=False)
+            return
+        steps = outputs["refinement_steps"] if self.model.refinement_enabled else {
+            "iteration_0": {
+                "pred_logits": outputs["segmentation-cls"],
+                "pred_masks": outputs["segmentation-mask"],
+            },
+        }
+        self.refinement_metrics.update(
+            steps,
+            inputs[self.target_segmentation_cls_key],
+            inputs[self.target_segmentation_data_mask_key],
+            inputs["x_mask"], inputs.get("subprocess_id"),
+        )
+
     def _log_refinement_metrics(self) -> None:
         if self.refinement_metrics is None:
             return
@@ -946,7 +957,19 @@ class EveNetEngine(L.LightningModule):
         if mode not in ("compact", "full"):
             raise ValueError("Metrics.Refinement.wandb_mode must be 'compact' or 'full'")
         metrics = self.refinement_metrics.compute()
-        scalars = metrics
+        refinement_enabled = self.model.refinement_enabled
+        depth = self.refinement_metrics.max_recycles
+        summary_names = ("dice", "iou", "class_accuracy", "exact_segment_accuracy", "exact_event_accuracy")
+        final_metrics = {}
+        for key, value in metrics.items():
+            group, separator, name = key.rpartition(f"/iteration_{depth}/")
+            if separator and name in (*summary_names, "events", "segments"):
+                final_metrics[f"{group.replace('refinement/val', 'segmentation/val', 1)}/{name}"] = value
+        segmentation_summary = {
+            f"segmentation/val/{name}": final_metrics[f"segmentation/val/{name}"]
+            for name in summary_names if f"segmentation/val/{name}" in final_metrics
+        }
+        scalars = metrics if refinement_enabled else {}
         if mode == "compact":
             names = cfg.get("summary_metrics", [
                 "exact_event_accuracy", "exact_segment_accuracy", "dice", "iou", "net_corrected_vs_0",
@@ -961,13 +984,14 @@ class EveNetEngine(L.LightningModule):
             ):
                 raise ValueError("Metrics.Refinement.summary_metrics must list valid refinement metric names")
             scalars = {
-                key: value for key, value in metrics.items()
+                key: value for key, value in scalars.items()
                 if key.startswith("refinement/val/iteration_") and key.rsplit("/", 1)[1] in names
             }
+        scalars = {**scalars, **segmentation_summary}
         if scalars:
             self.log_dict(scalars, on_step=False, on_epoch=True, sync_dist=False)
         if self.global_rank == 0 and not self.trainer.sanity_checking:
-            if mode == "compact":
+            if mode == "compact" and refinement_enabled:
                 rows = {}
                 for key, value in metrics.items():
                     path, name = key.removeprefix("refinement/val/").rsplit("/", 1)
@@ -986,16 +1010,20 @@ class EveNetEngine(L.LightningModule):
             for logger in self.loggers:
                 if isinstance(logger, LocalLogger):
                     # LocalLogger.log_metrics is a no-op; keep a fixed CSV schema here.
-                    path = Path(logger.log_dir) / "refinement_metrics.csv"
-                    exists = path.exists()
-                    with path.open("a", newline="") as handle:
-                        writer = csv.writer(handle)
-                        if not exists:
-                            writer.writerow(["epoch", "step", "metric", "value"])
-                        writer.writerows(
-                            (self.current_epoch, self.current_step, key, float(value))
-                            for key, value in metrics.items()
-                        )
+                    outputs = {"segmentation_metrics.csv": final_metrics}
+                    if refinement_enabled:
+                        outputs["refinement_metrics.csv"] = metrics
+                    for filename, values in outputs.items():
+                        path = Path(logger.log_dir) / filename
+                        exists = path.exists()
+                        with path.open("a", newline="") as handle:
+                            writer = csv.writer(handle)
+                            if not exists:
+                                writer.writerow(["epoch", "step", "metric", "value"])
+                            writer.writerows(
+                                (self.current_epoch, self.current_step, key, float(value))
+                                for key, value in values.items()
+                            )
 
     def _log_pair_contrastive_monitor(self) -> None:
         result = self.pair_contrastive_monitor_result
@@ -1570,13 +1598,15 @@ class EveNetEngine(L.LightningModule):
             segmentation=self.segmentation_cfg.include,
             normalization_dict=self.normalization_dict,
         )
-        if self.model.refinement_enabled:
+        if self.segmentation_cfg.include:
             self.refinement_metrics = RefinementMetrics(
-                max_recycles=self.model.max_recycles,
+                max_recycles=self.model.max_recycles if self.model.refinement_enabled else 0,
                 num_queries=self.model.Segmentation.num_queries,
                 device=self.device,
                 process_names=self.config.event_info.process_names,
-                mask_threshold=self.config.options.Metrics.get("Refinement", {}).get("mask_threshold", 0.5),
+                mask_threshold=self.config.options.Metrics.get("Segmentation", {}).get(
+                    "mask_threshold", self.config.options.Metrics.get("Refinement", {}).get("mask_threshold", 0.5)
+                ),
             )
 
         if self.global_rank == 0:
