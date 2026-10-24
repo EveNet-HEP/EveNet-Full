@@ -79,6 +79,13 @@ Prediction files retain these tensors for offline comparisons.
 
 ## Monitoring
 
+The example recipe explicitly enables `Metrics.PairRepresentation` every epoch.
+On the first validation batch from each worker, the existing pair monitor samples
+the final refinement pass and logs the pooled `pca/all` figure (raw, PL, and
+PL - P0) plus the `pair_monitor/*` separation/count scalars. Per-process figures
+remain opt-in through `process_plots`. These diagnostics are separate from the
+per-iteration metrics below, which cover the full validation set.
+
 When enabled, every validation batch with an active deterministic schedule
 collects every depth, independently of the existing expensive-metrics cadence.
 Counts reset at validation start and are summed across workers before division.

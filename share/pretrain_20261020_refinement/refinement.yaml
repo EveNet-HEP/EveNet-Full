@@ -5,7 +5,7 @@ logger:
   wandb:
     project: Pretrain-Pair-Representation
     entity: ytchou97-university-of-washington
-    run_name: mini-segmentation-refinement
+    run_name: mini-segmentation-refinement-turn-off
     tags: [Pretrain, Mini, Segmentation, Refinement]
     simplified: false
   local:
@@ -32,6 +32,9 @@ options:
             segmentation: [1.0, 1.0]
           train_parameters: {}
   Metrics:
+    PairRepresentation:
+      enabled: true
+      every_n_epochs: 1
     Segmentation:
       wandb_mode: compact
     Refinement:
@@ -41,7 +44,7 @@ options:
 network:
   default: ../network/network-mini.yaml
   Refinement:
-    enabled: true
+    enabled: false
     max_recycles: 2
   Segmentation:
     use_pair_representation: true
