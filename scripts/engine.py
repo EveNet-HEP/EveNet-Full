@@ -941,9 +941,48 @@ class EveNetEngine(L.LightningModule):
     def _log_refinement_metrics(self) -> None:
         if self.refinement_metrics is None:
             return
+        cfg = self.config.options.Metrics.get("Refinement", {})
+        mode = cfg.get("wandb_mode", "full")
+        if mode not in ("compact", "full"):
+            raise ValueError("Metrics.Refinement.wandb_mode must be 'compact' or 'full'")
         metrics = self.refinement_metrics.compute()
-        self.log_dict(metrics, on_step=False, on_epoch=True, sync_dist=False)
+        scalars = metrics
+        if mode == "compact":
+            names = cfg.get("summary_metrics", [
+                "exact_event_accuracy", "exact_segment_accuracy", "dice", "iou", "net_corrected_vs_0",
+            ])
+            allowed = {
+                "dice", "iou", "class_accuracy", "exact_segment_accuracy", "exact_event_accuracy",
+                "corrected_vs_0", "damaged_vs_0", "net_corrected_vs_0",
+                "corrected_vs_previous", "damaged_vs_previous", "events", "segments",
+            }
+            if not isinstance(names, (list, tuple)) or any(
+                not isinstance(name, str) or name not in allowed for name in names
+            ):
+                raise ValueError("Metrics.Refinement.summary_metrics must list valid refinement metric names")
+            scalars = {
+                key: value for key, value in metrics.items()
+                if key.startswith("refinement/val/iteration_") and key.rsplit("/", 1)[1] in names
+            }
+        if scalars:
+            self.log_dict(scalars, on_step=False, on_epoch=True, sync_dist=False)
         if self.global_rank == 0 and not self.trainer.sanity_checking:
+            if mode == "compact":
+                rows = {}
+                for key, value in metrics.items():
+                    path, name = key.removeprefix("refinement/val/").rsplit("/", 1)
+                    group, _, iteration = path.rpartition("/")
+                    row = rows.setdefault((group or "overall", int(iteration.removeprefix("iteration_"))), {})
+                    row[name] = float(value)
+                columns = sorted({name for row in rows.values() for name in row})
+                self.logger.experiment.log({
+                    "epoch": self.current_epoch,
+                    "refinement/val/breakdown": wandb.Table(
+                        columns=["group", "iteration", *columns],
+                        data=[[group, depth, *[row.get(name) for name in columns]]
+                              for (group, depth), row in rows.items()],
+                    ),
+                })
             for logger in self.loggers:
                 if isinstance(logger, LocalLogger):
                     # LocalLogger.log_metrics is a no-op; keep a fixed CSV schema here.
@@ -1363,7 +1402,8 @@ class EveNetEngine(L.LightningModule):
                 global_rank=self.global_rank,
                 metrics_valid=self.segmentation_metrics_valid,
                 metrics_train=self.segmentation_metrics_train,
-                logger=self.logger.experiment
+                logger=self.logger.experiment,
+                wandb_mode=self.config.options.Metrics.get("Segmentation", {}).get("wandb_mode", "full"),
             )
 
         self.general_log.finalize_epoch(is_train=False)

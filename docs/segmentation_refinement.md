@@ -82,7 +82,7 @@ Prediction files retain these tensors for offline comparisons.
 When enabled, every validation batch with an active deterministic schedule
 collects every depth, independently of the existing expensive-metrics cadence.
 Counts reset at validation start and are summed across workers before division.
-The existing loggers receive:
+The overall scalar keys use:
 
 ```text
 refinement/train/recycles
@@ -104,7 +104,7 @@ Each depth reports:
   preceding depth.
 - `events` and `segments`: denominators for interpreting the rates.
 
-The same metrics are available under
+In full logging mode, the same metrics are available under
 `refinement/val/process/PROCESS/iteration_N/...` and
 `refinement/val/segments/COUNT/iteration_N/...`, where COUNT is the number of
 non-null target instances. Hungarian matching reuses the segmentation matcher
@@ -112,7 +112,35 @@ with its default costs; padding is removed before matching and scoring.
 These diagnostics are unweighted, consistent with the existing segmentation
 metrics. Events with no valid input objects are excluded. Overlap and instance
 rates are omitted when there are no non-null targets.
-Lightning/W&B receives the scalar keys above. When a `LocalLogger` is attached,
+The example recipe uses compact logging to prevent one W&B panel per process,
+multiplicity, depth, and metric. Configure it under `options.Metrics`:
+
+```yaml
+Segmentation:
+  wandb_mode: compact
+Refinement:
+  mask_threshold: 0.5
+  wandb_mode: compact
+  summary_metrics: [exact_event_accuracy, exact_segment_accuracy, dice, iou, net_corrected_vs_0]
+```
+
+Compact refinement logs only the selected overall metrics at each depth (15
+scalar curves for three depths) plus one `refinement/val/breakdown` table with
+all groups, metrics, and denominators. Missing rates remain missing in the
+table. Compact segmentation keeps its two confusion matrices and puts class
+and process/multiplicity rates into `segmentation/classes` and
+`segmentation/processes` tables. Per-class score histograms are omitted in this
+mode. The two monitors therefore emit at most 20 validation panels with this
+recipe, independent of the number of processes. The training-depth scalar is
+separate. Set either `wandb_mode` to `full` to restore its detailed panels;
+omitting the setting preserves the previous full logging behavior.
+
+For an existing W&B workspace, previously created panels remain. Use a manual
+workspace and put iteration 0/1/2 on the same line plot for each summary metric,
+with epoch as the x-axis. Changing code/YAML requires a new or resumed training
+process; it does not update an already-running driver.
+
+When a `LocalLogger` is attached, regardless of W&B mode,
 rank zero also appends a long-format `refinement_metrics.csv` in its log directory
 with columns `epoch,step,metric,value`; sanity-validation passes are excluded
 from this file. This avoids changing the existing training CSV layout.

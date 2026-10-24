@@ -32,8 +32,12 @@ options:
             segmentation: [1.0, 1.0]
           train_parameters: {}
   Metrics:
+    Segmentation:
+      wandb_mode: compact
     Refinement:
       mask_threshold: 0.5
+      wandb_mode: compact
+      summary_metrics: [exact_event_accuracy, exact_segment_accuracy, dice, iou, net_corrected_vs_0]
 network:
   default: ../network/network-mini.yaml
   Refinement:
