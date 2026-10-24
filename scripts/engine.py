@@ -1,6 +1,8 @@
 import math
+import csv
 from collections import defaultdict
 from functools import partial
+from pathlib import Path
 from typing import Any, Union
 
 import wandb
@@ -33,6 +35,7 @@ from evenet.network.metrics.generation import shared_step as gen_step, shared_ep
 from evenet.network.metrics.pair_representation import PairRepresentationMonitor
 from evenet.network.metrics.pair_contrastive import PairContrastiveMonitor
 from evenet.network.metrics.segmentation import SegmentationMetrics
+from evenet.network.metrics.refinement import RefinementMetrics
 from evenet.network.metrics.segmentation import shared_step as seg_step, shared_epoch_end as seg_end
 from evenet.network.loss.famo import FAMO
 from evenet.utilities.ema import EMA
@@ -79,6 +82,7 @@ class EveNetEngine(L.LightningModule):
         self.generation_metrics_valid = None
         self.segmentation_metrics_train = None
         self.segmentation_metrics_valid = None
+        self.refinement_metrics = None
         self.model_parts = {}
         self.model: Union[EveNetModel, None] = None
         self.config = global_config
@@ -443,7 +447,7 @@ class EveNetEngine(L.LightningModule):
                 loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
 
         if self.segmentation_cfg.include and outputs["segmentation-cls"] is not None:
-            seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
+            seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device, dtype=torch.float32)
             seg_target_mask = batch[self.target_segmentation_data_mask_key].to(device=device)
             class_weight = self.segmentation_cls_balance.to(device=device)
             scaled_seg_loss = seg_step(
@@ -537,7 +541,8 @@ class EveNetEngine(L.LightningModule):
     def shared_step(
             self, batch: Any, batch_idx: int,
             loss_head_dict: dict,
-            update_metric: bool = True
+            update_metric: bool = True,
+            num_recycles: int | None = None,
     ):
 
         batch_size = batch["x"].shape[0]
@@ -626,9 +631,21 @@ class EveNetEngine(L.LightningModule):
             train_parameters=train_parameters,
             schedules=[(key, value) for key, value in schedules.items()],
             return_pair_states=monitor_pair_states,
+            num_recycles=num_recycles,
         )
+        self.last_refinement_depth = outputs.get("refinement_depth")
         if monitor_pair_states:
             self._collect_pair_monitor(inputs, outputs)
+        if self.refinement_metrics is not None and schedules.get("deterministic", False):
+            if self.training:
+                self.log("refinement/train/recycles", float(outputs["refinement_depth"]), sync_dist=False)
+            else:
+                self.refinement_metrics.update(
+                    outputs["refinement_steps"],
+                    inputs[self.target_segmentation_cls_key],
+                    inputs[self.target_segmentation_data_mask_key],
+                    inputs["x_mask"], inputs.get("subprocess_id"),
+                )
 
         loss_raw, loss_detailed_dict, ass_predicts = self.calculate_loss(
             inputs, outputs,
@@ -751,6 +768,7 @@ class EveNetEngine(L.LightningModule):
             update_metric=self.eval_metrics,
         )
         # print(f"[Step {step}] share step end", flush=True)
+        refinement_depth = self.last_refinement_depth
         final_loss = loss
         famo_logs = None
         if self.include_famo:
@@ -839,6 +857,7 @@ class EveNetEngine(L.LightningModule):
                     batch=batch, batch_idx=batch_idx,
                     loss_head_dict=loss_head,
                     update_metric=False,
+                    num_recycles=refinement_depth,
                 )
                 in_loss = loss_head if self.famo_detailed_loss else loss_raw
                 self.model.famo.update(in_loss)
@@ -919,6 +938,26 @@ class EveNetEngine(L.LightningModule):
                 plt.close(figure)
             self.pair_monitor_result = None
 
+    def _log_refinement_metrics(self) -> None:
+        if self.refinement_metrics is None:
+            return
+        metrics = self.refinement_metrics.compute()
+        self.log_dict(metrics, on_step=False, on_epoch=True, sync_dist=False)
+        if self.global_rank == 0 and not self.trainer.sanity_checking:
+            for logger in self.loggers:
+                if isinstance(logger, LocalLogger):
+                    # LocalLogger.log_metrics is a no-op; keep a fixed CSV schema here.
+                    path = Path(logger.log_dir) / "refinement_metrics.csv"
+                    exists = path.exists()
+                    with path.open("a", newline="") as handle:
+                        writer = csv.writer(handle)
+                        if not exists:
+                            writer.writerow(["epoch", "step", "metric", "value"])
+                        writer.writerows(
+                            (self.current_epoch, self.current_step, key, float(value))
+                            for key, value in metrics.items()
+                        )
+
     def _log_pair_contrastive_monitor(self) -> None:
         result = self.pair_contrastive_monitor_result
         if self.global_rank != 0 or result is None:
@@ -957,6 +996,8 @@ class EveNetEngine(L.LightningModule):
             batch_size=batch_size,
             train_parameters=None,
         )
+        # Depth is batch metadata, not an event array for prediction writers.
+        outputs.pop("refinement_depth", None)
 
         if self.save_loss_predict:
             _, loss_head_dict = self.prepare_heads_loss()
@@ -1260,6 +1301,8 @@ class EveNetEngine(L.LightningModule):
         self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
         self.pair_monitor_result = None
         self.pair_contrastive_monitor_result = None
+        if self.refinement_metrics is not None:
+            self.refinement_metrics.reset()
 
         self.l.info(f"[Epoch {self.current_epoch:03d}] ▶️ Validation Start | eval_metrics: {self.eval_metrics}")
         pass
@@ -1274,6 +1317,7 @@ class EveNetEngine(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         self._log_pair_monitor()
         self._log_pair_contrastive_monitor()
+        self._log_refinement_metrics()
 
         if self.classification_cfg.include and self.current_schedule.get("deterministic", False) and self.eval_metrics:
             cls_end(
@@ -1486,6 +1530,14 @@ class EveNetEngine(L.LightningModule):
             segmentation=self.segmentation_cfg.include,
             normalization_dict=self.normalization_dict,
         )
+        if self.model.refinement_enabled:
+            self.refinement_metrics = RefinementMetrics(
+                max_recycles=self.model.max_recycles,
+                num_queries=self.model.Segmentation.num_queries,
+                device=self.device,
+                process_names=self.config.event_info.process_names,
+                mask_threshold=self.config.options.Metrics.get("Refinement", {}).get("mask_threshold", 0.5),
+            )
 
         if self.global_rank == 0:
             ema_enable = self.ema_cfg.get("enable", False)
