@@ -1,0 +1,59 @@
+# Opt-in experiment; existing mini ablations remain unchanged.
+platform:
+  default: ../pretrain_20261013_pair_mini/platform.yaml
+logger:
+  wandb:
+    project: Pretrain-Pair-Representation
+    entity: ytchou97-university-of-washington
+    run_name: mini-segmentation-refinement
+    tags: [Pretrain, Mini, Segmentation, Refinement]
+    simplified: false
+  local:
+    save_dir: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-segmentation-refinement/logs
+    name: mini-segmentation-refinement
+    version: train
+options:
+  default: ../pretrain_20261013_pair_mini/options.yaml
+  Dataset:
+    dataset_limit: 0.003
+    dataset_limit_apply_to_val_set: true
+  Training:
+    model_checkpoint_save_path: /pscratch/sd/t/tihsu/database/Pretrain-PairRepresentation/mini-segmentation-refinement/checkpoints/refinement
+    Components:
+      Segmentation:
+        include: true
+    ProgressiveTraining:
+      stages:
+        - name: full_training
+          epoch_ratio: 1.0
+          transition_ratio: 0.1
+          loss_weights:
+            classification: [1.0, 1.0]
+            segmentation: [1.0, 1.0]
+          train_parameters: {}
+  Metrics:
+    Refinement:
+      mask_threshold: 0.5
+network:
+  default: ../network/network-mini.yaml
+  Refinement:
+    enabled: true
+    max_recycles: 2
+  Segmentation:
+    use_pair_representation: true
+  Classification:
+    use_pair_representation: true
+  Body:
+    PairCreator:
+      create: [logDeltaR, logMass, logKT, logPTRatio]
+    PET:
+      attention_bias_type: IterativeUpdate
+      use_object_to_pair: true
+      use_triangle_attention: false
+      use_triangle_multiplication: true
+event_info:
+  default: ../event_info/multi_process.yaml
+resonance:
+  default: ../resonance/standard_model.yaml
+process_info:
+  default: ../process_info/pretrain.yaml
